@@ -2,22 +2,23 @@
 
 import { useState } from 'react';
 import { BIAEntry, METRIC_DEFINITIONS, CATEGORY_LABELS, MetricDefinition } from '@/lib/types';
+import Tooltip from './Tooltip';
 
 interface DataTableProps {
   entries: BIAEntry[];
   onDelete: (id: string) => void;
 }
 
-function formatValue(value: unknown, unit: string): string {
-  if (value === null || value === undefined) return '-';
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return '—';
   if (typeof value === 'object' && 'lb' in value && 'percent' in value) {
     const seg = value as { lb: number; percent: number };
-    if (seg.lb === 0) return '-';
-    return `${seg.lb}`;
+    if (seg.lb === 0) return '—';
+    return seg.lb.toFixed(1);
   }
   if (typeof value === 'number') {
-    if (value === 0) return '-';
-    return `${value}`;
+    if (value === 0) return '—';
+    return value.toFixed(1);
   }
   return String(value);
 }
@@ -46,6 +47,32 @@ function getTrendIndicator(
     color: improved ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400',
     arrow: diff > 0 ? '↑' : '↓'
   };
+}
+
+type RangeStatus = 'below' | 'within' | 'above' | null;
+
+function getRangeStatus(value: number, metric: MetricDefinition): RangeStatus {
+  if (!metric.normalRange || value === 0) return null;
+  const { min, max } = metric.normalRange;
+  if (value < min) return 'below';
+  if (value > max) return 'above';
+  return 'within';
+}
+
+function getRangeIndicator(status: RangeStatus, metric: MetricDefinition): { dotColor: string; label: string } {
+  const range = metric.normalRange;
+  const rangeStr = range ? ` (${range.min}–${range.max}${metric.unit})` : '';
+
+  switch (status) {
+    case 'below':
+      return { dotColor: 'bg-amber-500', label: `Below normal${rangeStr}` };
+    case 'above':
+      return { dotColor: 'bg-red-500', label: `Above normal${rangeStr}` };
+    case 'within':
+      return { dotColor: 'bg-emerald-500', label: `Within normal${rangeStr}` };
+    default:
+      return { dotColor: '', label: '' };
+  }
 }
 
 function formatDate(isoDate: string): string {
@@ -141,7 +168,6 @@ export default function DataTable({ entries, onDelete }: DataTableProps) {
               { key: 'muscleLeftLeg', label: 'Left Leg' },
               { key: 'muscleRightLeg', label: 'Right Leg' },
             ]}
-            unit="lb"
           />
 
           <SegmentalSection
@@ -156,7 +182,6 @@ export default function DataTable({ entries, onDelete }: DataTableProps) {
               { key: 'fatLeftLeg', label: 'Left Leg' },
               { key: 'fatRightLeg', label: 'Right Leg' },
             ]}
-            unit="lb"
           />
         </tbody>
       </table>
@@ -210,7 +235,16 @@ function CategorySection({
             className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
           >
             <td className="sticky left-0 bg-white dark:bg-gray-900 px-4 py-1.5 text-gray-600 dark:text-gray-300">
-              <span className="text-xs">{metric.label}</span>
+              <span className="text-xs inline-flex items-center gap-1">
+                {metric.label}
+                {metric.normalRange && (
+                  <Tooltip content={`Normal: ${metric.normalRange.min}–${metric.normalRange.max}${metric.unit}`}>
+                    <svg className="w-3 h-3 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </Tooltip>
+                )}
+              </span>
             </td>
             {entries.map((entry, entryIdx) => {
               const value = entry[metric.key];
@@ -221,15 +255,29 @@ function CategorySection({
 
               const numValue = typeof value === 'number' ? value : 0;
               const { color, arrow } = getTrendIndicator(numValue, previousValue, metric);
+              const rangeStatus = getRangeStatus(numValue, metric);
+              const { dotColor, label: rangeLabel } = getRangeIndicator(rangeStatus, metric);
+              const displayValue = formatValue(value);
 
               return (
                 <td
                   key={entry.id}
                   className="px-3 py-1.5 text-center"
                 >
-                  <span className={`text-xs tabular-nums ${color || 'text-gray-900 dark:text-gray-100'}`}>
-                    {formatValue(value, metric.unit)}
-                    {arrow && <span className="ml-0.5 text-[10px]">{arrow}</span>}
+                  <span className={`text-xs inline-flex items-center justify-center gap-1.5 ${color || 'text-gray-900 dark:text-gray-100'}`}>
+                    {rangeStatus ? (
+                      <Tooltip content={rangeLabel}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${dotColor} cursor-help flex-shrink-0`} />
+                      </Tooltip>
+                    ) : (
+                      <span className="w-1.5" />
+                    )}
+                    <span className="tabular-nums w-14 text-right">{displayValue}</span>
+                    {arrow ? (
+                      <span className="text-[10px] w-3">{arrow}</span>
+                    ) : (
+                      <span className="w-3" />
+                    )}
                   </span>
                 </td>
               );
@@ -246,7 +294,6 @@ interface SegmentalSectionProps {
   onToggle: () => void;
   entries: BIAEntry[];
   fields: Array<{ key: keyof BIAEntry; label: string }>;
-  unit: string;
 }
 
 function SegmentalSection({
@@ -255,7 +302,6 @@ function SegmentalSection({
   onToggle,
   entries,
   fields,
-  unit,
 }: SegmentalSectionProps) {
   return (
     <>
@@ -296,8 +342,10 @@ function SegmentalSection({
                   key={entry.id}
                   className="px-3 py-1.5 text-center"
                 >
-                  <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
-                    {formatValue(value, unit)}
+                  <span className="text-xs inline-flex items-center justify-center gap-1.5 text-gray-900 dark:text-gray-100">
+                    <span className="w-1.5" />
+                    <span className="tabular-nums w-14 text-right">{formatValue(value)}</span>
+                    <span className="w-3" />
                   </span>
                 </td>
               );

@@ -15,6 +15,16 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "BIA Tracker",
   description: "Track your body composition analysis over time",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f9fafb" },
+    { media: "(prefers-color-scheme: dark)", color: "#030712" },
+  ],
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "BIA Tracker",
+  },
 };
 
 export default function RootLayout({
