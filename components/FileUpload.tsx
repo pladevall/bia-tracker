@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 
 interface FileUploadProps {
-  onUpload: (file: File) => Promise<void>;
+  onUpload: (files: File[]) => Promise<void>;
   isLoading: boolean;
   progress?: string;
 }
@@ -11,19 +11,20 @@ interface FileUploadProps {
 export default function FileUpload({ onUpload, isLoading, progress }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      return;
+  const handleFiles = useCallback(async (files: FileList | File[]) => {
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (imageFiles.length > 0) {
+      await onUpload(imageFiles);
     }
-    await onUpload(file);
   }, [onUpload]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
-  }, [handleFile]);
+    if (e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  }, [handleFiles]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -36,9 +37,12 @@ export default function FileUpload({ onUpload, isLoading, progress }: FileUpload
   }, []);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFile(file);
-  }, [handleFile]);
+    if (e.target.files && e.target.files.length > 0) {
+      handleFiles(e.target.files);
+    }
+    // Reset input so same file can be selected again
+    e.target.value = '';
+  }, [handleFiles]);
 
   return (
     <div
@@ -57,6 +61,7 @@ export default function FileUpload({ onUpload, isLoading, progress }: FileUpload
       <input
         type="file"
         accept="image/*"
+        multiple
         onChange={handleInputChange}
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
         disabled={isLoading}
@@ -103,9 +108,9 @@ export default function FileUpload({ onUpload, isLoading, progress }: FileUpload
             />
           </svg>
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            Drop screenshot or <span className="text-gray-900 dark:text-gray-100 font-medium">browse</span>
+            Drop screenshots or <span className="text-gray-900 dark:text-gray-100 font-medium">browse</span>
           </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">PNG, JPG</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">PNG, JPG · Multiple files supported</p>
         </div>
       )}
     </div>

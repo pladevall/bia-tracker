@@ -38,31 +38,50 @@ export default function Home() {
     init();
   }, []);
 
-  const handleUpload = useCallback(async (file: File) => {
+  const handleUpload = useCallback(async (files: File[]) => {
     setIsLoading(true);
     setError(null);
-    setProgress('Scanning image...');
+
+    const total = files.length;
+    let processed = 0;
+    let failed = 0;
 
     try {
-      const { entry } = await parsePDFFile(file, setProgress);
+      for (const file of files) {
+        processed++;
+        setProgress(`Processing ${processed}/${total}...`);
 
-      const hasData = entry.weight > 0 || entry.bodyFatPercentage > 0 || entry.fitnessScore > 0;
+        try {
+          const { entry } = await parsePDFFile(file, (msg) => {
+            setProgress(`(${processed}/${total}) ${msg}`);
+          });
 
-      if (!hasData) {
-        setError('Could not extract data from image. Please try a clearer screenshot.');
-        return;
+          const hasData = entry.weight > 0 || entry.bodyFatPercentage > 0 || entry.fitnessScore > 0;
+
+          if (!hasData) {
+            failed++;
+            continue;
+          }
+
+          setProgress(`(${processed}/${total}) Saving to cloud...`);
+          await saveEntryToDb(entry);
+        } catch (err) {
+          console.error('Error processing file:', err);
+          failed++;
+        }
       }
-
-      setProgress('Saving to cloud...');
-      await saveEntryToDb(entry);
 
       // Refresh entries from cloud
       const cloudEntries = await getEntriesFromDb();
       setEntries(cloudEntries);
       setProgress('');
+
+      if (failed > 0) {
+        setError(`Processed ${total - failed}/${total} images. ${failed} failed to parse.`);
+      }
     } catch (err) {
-      console.error('Parsing error:', err);
-      setError('Failed to parse image: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      console.error('Upload error:', err);
+      setError('Failed to process images: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setIsLoading(false);
     }
