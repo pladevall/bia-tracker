@@ -130,3 +130,109 @@ export const CATEGORY_LABELS: Record<MetricDefinition['category'], string> = {
   'segmental-fat': 'Segmental Fat',
   'recommendations': 'Weight Control',
 };
+
+// ========================================
+// Bodyspec Types
+// ========================================
+
+export interface BodyspecConnection {
+  id: string;
+  userId?: string;
+  accessToken: string;
+  tokenName: string;
+  lastSync: string | null;
+  syncStatus: 'connected' | 'error' | 'pending';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BodyspecScan {
+  id: string;
+  connectionId: string;
+  scanDate: string;
+  appointmentId: string | null;
+  data: BodyspecScanData;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RegionalData {
+  fat: number;      // lb
+  lean: number;     // lb
+  bmd?: number;     // Bone mineral density
+}
+
+export interface BodyspecScanData {
+  // Core metrics that map to BIA
+  bodyFatPercentage: number;
+  totalBodyFat: number;        // lb
+  leanBodyMass: number;        // lb
+  boneMineralDensity: number;
+  visceralAdiposeTissue: number; // VAT (cm²)
+  weight: number;              // lb
+
+  // Regional breakdowns
+  regional: {
+    leftArm: RegionalData;
+    rightArm: RegionalData;
+    trunk: RegionalData;
+    leftLeg: RegionalData;
+    rightLeg: RegionalData;
+  };
+
+  // Additional DEXA metrics
+  androidGynoidRatio?: number;
+  boneMineralContent?: number;  // grams
+  tScore?: number;              // Bone density T-score
+  zScore?: number;              // Bone density Z-score
+}
+
+// Data source types for comparison views
+export type DataSource = 'bia' | 'bodyspec';
+
+export interface ComparisonEntry {
+  date: string;
+  source: DataSource;
+  biaData?: BIAEntry;
+  bodyspecData?: BodyspecScan;
+}
+
+// Metric mapping between BIA and Bodyspec
+export interface MetricMapping {
+  biaKey: keyof BIAEntry;
+  bodyspecKey: keyof BodyspecScanData | string; // string for nested paths like 'regional.trunk.fat'
+  label: string;
+  unit: string;
+  expectedVariance?: number; // Expected % difference between BIA and DEXA
+}
+
+export const BODYSPEC_BIA_MAPPINGS: MetricMapping[] = [
+  {
+    biaKey: 'bodyFatPercentage',
+    bodyspecKey: 'bodyFatPercentage',
+    label: 'Body Fat %',
+    unit: '%',
+    expectedVariance: 3, // BIA can vary ±3% from DEXA
+  },
+  {
+    biaKey: 'weight',
+    bodyspecKey: 'weight',
+    label: 'Weight',
+    unit: 'lb',
+    expectedVariance: 0.5,
+  },
+  {
+    biaKey: 'lbm',
+    bodyspecKey: 'leanBodyMass',
+    label: 'Lean Body Mass',
+    unit: 'lb',
+    expectedVariance: 5,
+  },
+  {
+    biaKey: 'visceralFat',
+    bodyspecKey: 'visceralAdiposeTissue',
+    label: 'Visceral Fat',
+    unit: '',
+    expectedVariance: 10,
+  },
+];

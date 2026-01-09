@@ -3,17 +3,42 @@
 import { useState, useEffect, useCallback } from 'react';
 import FileUpload from '@/components/FileUpload';
 import DataTable from '@/components/DataTable';
-import { BIAEntry } from '@/lib/types';
+import BodyspecConnect from '@/components/BodyspecConnect';
+import BodyspecSyncButton from '@/components/BodyspecSyncButton';
+import { BIAEntry, BodyspecScan } from '@/lib/types';
 import { parsePDFFile } from '@/lib/client-pdf-parser';
 import ThemeToggle from '@/components/ThemeToggle';
 import { getEntriesFromDb, saveEntryToDb, deleteEntryFromDb, migrateFromLocalStorage } from '@/lib/supabase';
 
 export default function Home() {
   const [entries, setEntries] = useState<BIAEntry[]>([]);
+  const [bodyspecScans, setBodyspecScans] = useState<BodyspecScan[]>([]);
+  const [bodyspecConnections, setBodyspecConnections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [showBodyspecSection, setShowBodyspecSection] = useState(false);
+
+  const loadBodyspecData = useCallback(async () => {
+    try {
+      // Load connections
+      const connectionsRes = await fetch('/api/bodyspec/connections');
+      if (connectionsRes.ok) {
+        const connectionsData = await connectionsRes.json();
+        setBodyspecConnections(connectionsData.connections || []);
+      }
+
+      // Load scans
+      const scansRes = await fetch('/api/bodyspec/scans');
+      if (scansRes.ok) {
+        const scansData = await scansRes.json();
+        setBodyspecScans(scansData.scans || []);
+      }
+    } catch (err) {
+      console.error('Failed to load Bodyspec data:', err);
+    }
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -27,6 +52,9 @@ export default function Home() {
         // Then fetch from cloud
         const cloudEntries = await getEntriesFromDb();
         setEntries(cloudEntries);
+
+        // Load Bodyspec data
+        await loadBodyspecData();
       } catch (err) {
         console.error('Failed to load entries:', err);
         setError('Failed to load data. Please check your connection.');
@@ -36,7 +64,7 @@ export default function Home() {
     };
 
     init();
-  }, []);
+  }, [loadBodyspecData]);
 
   const handleUpload = useCallback(async (files: File[]) => {
     setIsLoading(true);
@@ -140,10 +168,90 @@ export default function Home() {
           )}
         </section>
 
+        {/* Bodyspec Integration Section */}
+        <section className="mb-6">
+          <button
+            onClick={() => setShowBodyspecSection(!showBodyspecSection)}
+            className="w-full bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-amber-600 dark:text-amber-400 text-xl">⚡</span>
+              <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                Bodyspec DEXA Integration
+              </h2>
+              {bodyspecScans.length > 0 && (
+                <span className="text-xs bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded">
+                  {bodyspecScans.length} {bodyspecScans.length === 1 ? 'scan' : 'scans'}
+                </span>
+              )}
+            </div>
+            <svg
+              className={`w-5 h-5 text-gray-500 transition-transform ${showBodyspecSection ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showBodyspecSection && (
+            <div className="mt-4 space-y-4">
+              <BodyspecConnect onConnectionChange={loadBodyspecData} />
+
+              {bodyspecConnections.length > 0 && (
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Sync DEXA Scans
+                  </h3>
+                  {bodyspecConnections.map((connection) => (
+                    <BodyspecSyncButton
+                      key={connection.id}
+                      connection={connection}
+                      onSyncComplete={loadBodyspecData}
+                      className="mb-4"
+                    />
+                  ))}
+                </div>
+              )}
+
+              {bodyspecScans.length > 0 && (
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    DEXA Scans
+                  </h3>
+                  <div className="space-y-2">
+                    {bodyspecScans.map((scan) => (
+                      <div
+                        key={scan.id}
+                        className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/20 rounded-md"
+                      >
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {new Date(scan.scanDate).toLocaleDateString()}
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Body Fat: {scan.data.bodyFatPercentage.toFixed(1)}% •
+                            Weight: {scan.data.weight.toFixed(1)} lb •
+                            Lean Mass: {scan.data.leanBodyMass.toFixed(1)} lb
+                          </div>
+                        </div>
+                        <span className="text-amber-600 dark:text-amber-400 text-sm font-medium">
+                          DEXA
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
         <section className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
             <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              Measurements
+              BIA Measurements
             </h2>
             {entries.length > 0 && (
               <span className="text-xs text-gray-500 dark:text-gray-400">
