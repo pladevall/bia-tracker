@@ -13,6 +13,7 @@ export default function BodyspecConnect({ onConnectionChange }: BodyspecConnectP
   const [connectionName, setConnectionName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Check for OAuth callback messages in URL
   useEffect(() => {
@@ -48,6 +49,8 @@ export default function BodyspecConnect({ onConnectionChange }: BodyspecConnectP
       setConnections(data.connections || []);
     } catch (err) {
       console.error('Error loading connections:', err);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -89,6 +92,11 @@ export default function BodyspecConnect({ onConnectionChange }: BodyspecConnectP
       setError((err as Error).message);
     }
   }, [loadConnections, onConnectionChange]);
+
+  // Show nothing while loading to prevent flash
+  if (isLoading) {
+    return null;
+  }
 
   // If not connected, show connect button
   if (connections.length === 0) {
@@ -193,20 +201,12 @@ export default function BodyspecConnect({ onConnectionChange }: BodyspecConnectP
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="font-medium text-gray-900 dark:text-white">{connection.tokenName}</span>
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-            connected
-          </span>
-        </div>
-        <button
-          onClick={() => handleDisconnect(connection.id)}
-          className="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors"
-        >
-          Disconnect
-        </button>
-      </div>
+      <button
+        onClick={() => handleDisconnect(connection.id)}
+        className="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors"
+      >
+        Disconnect
+      </button>
     </div>
   );
 }

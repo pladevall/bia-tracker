@@ -312,10 +312,15 @@ export default function DataTable({ entries, goals, bodyspecScans = [], onDelete
     setExpandedCategories(newExpanded);
   };
 
-  // Sort DEXA scans by date descending (newest first on left, like BIA entries)
-  const sortedScans = [...bodyspecScans].sort((a, b) =>
-    new Date(b.scanDate).getTime() - new Date(a.scanDate).getTime()
-  );
+  // Create combined columns for BIA entries and DEXA scans, sorted by date (newest first)
+  type DataColumn =
+    | { type: 'bia'; data: BIAEntry; date: Date }
+    | { type: 'dexa'; data: BodyspecScan; date: Date };
+
+  const dataColumns: DataColumn[] = [
+    ...entries.map(entry => ({ type: 'bia' as const, data: entry, date: new Date(entry.date) })),
+    ...bodyspecScans.map(scan => ({ type: 'dexa' as const, data: scan, date: new Date(scan.scanDate) })),
+  ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   const comparisonEntry = getComparisonEntry(entries, trendPeriod);
   const goalsMap = new Map(goals.map(g => [g.metricKey, g.targetValue]));
@@ -362,41 +367,41 @@ export default function DataTable({ entries, goals, bodyspecScans = [], onDelete
                 </div>
               </div>
             </th>
-            {/* DEXA Scan Columns */}
-            {sortedScans.map((scan) => (
-              <th
-                key={scan.id}
-                className="px-3 py-2 text-center min-w-[100px] border-l border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-900/20"
-              >
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {formatDate(scan.scanDate)}
-                  </span>
-                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">DEXA</span>
-                </div>
-              </th>
-            ))}
-            {/* BIA Entry Columns */}
-            {entries.map((entry) => (
-              <th
-                key={entry.id}
-                className="px-3 py-2 text-center min-w-[100px] border-l border-gray-100 dark:border-gray-800/50"
-              >
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="text-xs font-medium text-gray-900 dark:text-gray-100">
-                    {formatDate(entry.date)}
-                  </span>
-                  <button
-                    onClick={() => onDelete(entry.id)}
-                    className="text-[10px] text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </th>
+            {/* Combined Date-Sorted Columns (BIA + DEXA interleaved by date, newest first) */}
+            {dataColumns.map((col) => (
+              col.type === 'dexa' ? (
+                <th
+                  key={col.data.id}
+                  className="px-3 py-2 text-center min-w-[100px] border-l border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-900/20"
+                >
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {formatDate(col.data.scanDate)}
+                    </span>
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">DEXA</span>
+                  </div>
+                </th>
+              ) : (
+                <th
+                  key={col.data.id}
+                  className="px-3 py-2 text-center min-w-[100px] border-l border-gray-100 dark:border-gray-800/50"
+                >
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                      {formatDate(col.data.date)}
+                    </span>
+                    <button
+                      onClick={() => onDelete(col.data.id)}
+                      className="text-[10px] text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </th>
+              )
             ))}
           </tr>
         </thead>
@@ -413,7 +418,7 @@ export default function DataTable({ entries, goals, bodyspecScans = [], onDelete
                 categoryLabel={CATEGORY_LABELS[category]}
                 metrics={metricsInCategory}
                 entries={entries}
-                bodyspecScans={sortedScans}
+                bodyspecScans={bodyspecScans}
                 comparisonEntry={comparisonEntry}
                 isExpanded={expandedCategories.has(category)}
                 onToggle={() => toggleCategory(category)}
@@ -430,7 +435,7 @@ export default function DataTable({ entries, goals, bodyspecScans = [], onDelete
             isExpanded={expandedCategories.has('segmental-muscle')}
             onToggle={() => toggleCategory('segmental-muscle')}
             entries={entries}
-            bodyspecScans={sortedScans}
+            bodyspecScans={bodyspecScans}
             comparisonEntry={comparisonEntry}
             fields={[
               { key: 'muscleLeftArm', label: 'Left Arm' },
@@ -450,7 +455,7 @@ export default function DataTable({ entries, goals, bodyspecScans = [], onDelete
             isExpanded={expandedCategories.has('segmental-fat')}
             onToggle={() => toggleCategory('segmental-fat')}
             entries={entries}
-            bodyspecScans={sortedScans}
+            bodyspecScans={bodyspecScans}
             comparisonEntry={comparisonEntry}
             fields={[
               { key: 'fatLeftArm', label: 'Left Arm' },
@@ -477,7 +482,7 @@ export default function DataTable({ entries, goals, bodyspecScans = [], onDelete
                 categoryLabel={CATEGORY_LABELS[category]}
                 metrics={metricsInCategory}
                 entries={entries}
-                bodyspecScans={sortedScans}
+                bodyspecScans={bodyspecScans}
                 comparisonEntry={comparisonEntry}
                 isExpanded={expandedCategories.has(category)}
                 onToggle={() => toggleCategory(category)}
@@ -532,6 +537,16 @@ function CategorySection({
 }: CategorySectionProps) {
   const latestEntry = entries[0];
 
+  // Create combined columns for interleaved rendering matching header order
+  type DataColumn =
+    | { type: 'bia'; data: BIAEntry; date: Date }
+    | { type: 'dexa'; data: BodyspecScan; date: Date };
+
+  const dataColumns: DataColumn[] = [
+    ...entries.map(entry => ({ type: 'bia' as const, data: entry, date: new Date(entry.date) })),
+    ...bodyspecScans.map(scan => ({ type: 'dexa' as const, data: scan, date: new Date(scan.scanDate) })),
+  ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
   return (
     <>
       <tr
@@ -556,18 +571,14 @@ function CategorySection({
         <td className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50" />
         <td className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50" />
         <td className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50" />
-        {/* DEXA scan cells */}
-        {bodyspecScans.map((scan) => (
+        {/* Combined cells matching header order */}
+        {dataColumns.map((col) => (
           <td
-            key={scan.id}
-            className="bg-amber-50/30 dark:bg-amber-900/10 border-l border-amber-200 dark:border-amber-800/50"
-          />
-        ))}
-        {/* BIA entry cells */}
-        {entries.map((entry) => (
-          <td
-            key={entry.id}
-            className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50"
+            key={col.type === 'dexa' ? col.data.id : col.data.id}
+            className={col.type === 'dexa'
+              ? "bg-amber-50/30 dark:bg-amber-900/10 border-l border-amber-200 dark:border-amber-800/50"
+              : "bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50"
+            }
           />
         ))}
       </tr>
@@ -656,60 +667,62 @@ function CategorySection({
                   {trendText}
                 </span>
               </td>
-              {/* DEXA scan data cells */}
-              {bodyspecScans.map((scan) => {
-                const dexaValue = getDexaValueForMetric(scan, metric.key as string);
-                return (
-                  <td
-                    key={scan.id}
-                    className="px-3 py-1.5 text-center border-l border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-900/10"
-                  >
-                    {dexaValue !== null ? (
-                      <span className="text-xs tabular-nums font-medium text-amber-700 dark:text-amber-300">
-                        {dexaValue.toFixed(1)}
+              {/* Combined data cells matching header order */}
+              {dataColumns.map((col) => {
+                if (col.type === 'dexa') {
+                  const dexaValue = getDexaValueForMetric(col.data, metric.key as string);
+                  return (
+                    <td
+                      key={col.data.id}
+                      className="px-3 py-1.5 text-center border-l border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-900/10"
+                    >
+                      {dexaValue !== null ? (
+                        <span className="text-xs tabular-nums font-medium text-amber-700 dark:text-amber-300">
+                          {dexaValue.toFixed(1)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
+                      )}
+                    </td>
+                  );
+                } else {
+                  const entry = col.data;
+                  const entryIdx = entries.indexOf(entry);
+                  const value = entry[metric.key];
+                  const previousEntry = entries[entryIdx + 1];
+                  const previousValue = previousEntry
+                    ? (previousEntry[metric.key] as number)
+                    : undefined;
+
+                  const numValue = typeof value === 'number' ? value : 0;
+                  const { color, arrow } = getTrendIndicator(numValue, previousValue, metric);
+                  const rangeStatus = getRangeStatus(numValue, metric);
+                  const { dotColor, label: rangeLabel } = getRangeIndicator(rangeStatus, metric);
+                  const displayValue = formatValue(value);
+
+                  return (
+                    <td
+                      key={entry.id}
+                      className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50"
+                    >
+                      <span className={`text-xs inline-flex items-center justify-center gap-1.5 ${color || 'text-gray-900 dark:text-gray-100'}`}>
+                        {rangeStatus ? (
+                          <Tooltip content={rangeLabel}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${dotColor} cursor-help flex-shrink-0`} />
+                          </Tooltip>
+                        ) : (
+                          <span className="w-1.5" />
+                        )}
+                        <span className="tabular-nums w-14 text-right">{displayValue}</span>
+                        {arrow ? (
+                          <span className="text-[10px] w-3">{arrow}</span>
+                        ) : (
+                          <span className="w-3" />
+                        )}
                       </span>
-                    ) : (
-                      <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
-                    )}
-                  </td>
-                );
-              })}
-              {/* BIA entry data cells */}
-              {entries.map((entry, entryIdx) => {
-                const value = entry[metric.key];
-                const previousEntry = entries[entryIdx + 1];
-                const previousValue = previousEntry
-                  ? (previousEntry[metric.key] as number)
-                  : undefined;
-
-                const numValue = typeof value === 'number' ? value : 0;
-                const { color, arrow } = getTrendIndicator(numValue, previousValue, metric);
-                const rangeStatus = getRangeStatus(numValue, metric);
-                const { dotColor, label: rangeLabel } = getRangeIndicator(rangeStatus, metric);
-                const displayValue = formatValue(value);
-
-                return (
-                  <td
-                    key={entry.id}
-                    className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50"
-                  >
-                    <span className={`text-xs inline-flex items-center justify-center gap-1.5 ${color || 'text-gray-900 dark:text-gray-100'}`}>
-                      {rangeStatus ? (
-                        <Tooltip content={rangeLabel}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${dotColor} cursor-help flex-shrink-0`} />
-                        </Tooltip>
-                      ) : (
-                        <span className="w-1.5" />
-                      )}
-                      <span className="tabular-nums w-14 text-right">{displayValue}</span>
-                      {arrow ? (
-                        <span className="text-[10px] w-3">{arrow}</span>
-                      ) : (
-                        <span className="w-3" />
-                      )}
-                    </span>
-                  </td>
-                );
+                    </td>
+                  );
+                }
               })}
             </tr>
           );
@@ -768,6 +781,16 @@ function SegmentalSection({
 }: SegmentalSectionProps) {
   const latestEntry = entries[0];
 
+  // Create combined columns for interleaved rendering matching header order
+  type DataColumn =
+    | { type: 'bia'; data: BIAEntry; date: Date }
+    | { type: 'dexa'; data: BodyspecScan; date: Date };
+
+  const dataColumns: DataColumn[] = [
+    ...entries.map(entry => ({ type: 'bia' as const, data: entry, date: new Date(entry.date) })),
+    ...bodyspecScans.map(scan => ({ type: 'dexa' as const, data: scan, date: new Date(scan.scanDate) })),
+  ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
   return (
     <>
       <tr
@@ -792,18 +815,14 @@ function SegmentalSection({
         <td className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50" />
         <td className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50" />
         <td className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50" />
-        {/* DEXA scan cells */}
-        {bodyspecScans.map((scan) => (
+        {/* Combined cells matching header order */}
+        {dataColumns.map((col) => (
           <td
-            key={scan.id}
-            className="bg-amber-50/30 dark:bg-amber-900/10 border-l border-amber-200 dark:border-amber-800/50"
-          />
-        ))}
-        {/* BIA entry cells */}
-        {entries.map((entry) => (
-          <td
-            key={entry.id}
-            className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50"
+            key={col.type === 'dexa' ? col.data.id : col.data.id}
+            className={col.type === 'dexa'
+              ? "bg-amber-50/30 dark:bg-amber-900/10 border-l border-amber-200 dark:border-amber-800/50"
+              : "bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50"
+            }
           />
         ))}
       </tr>
@@ -881,51 +900,53 @@ function SegmentalSection({
                   {trendText}
                 </span>
               </td>
-              {/* DEXA scan data cells */}
-              {bodyspecScans.map((scan) => {
-                const dexaValue = getDexaSegmentalValue(scan, field.key as string);
-                return (
-                  <td
-                    key={scan.id}
-                    className="px-3 py-1.5 text-center border-l border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-900/10"
-                  >
-                    {dexaValue !== null ? (
-                      <span className="text-xs tabular-nums font-medium text-amber-700 dark:text-amber-300">
-                        {dexaValue.toFixed(1)}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
-                    )}
-                  </td>
-                );
-              })}
-              {/* BIA entry data cells */}
-              {entries.map((entry, entryIdx) => {
-                const value = entry[field.key] as { lb: number; percent: number } | undefined;
-                const currentLb = value?.lb || 0;
-
-                const previousEntry = entries[entryIdx + 1];
-                const previousValue = previousEntry?.[field.key] as { lb: number; percent: number } | undefined;
-                const previousLb = previousValue?.lb || 0;
-
-                const { color, arrow } = getSegmentalTrendIndicator(currentLb, previousLb, higherIsBetter);
-
-                return (
-                  <td
-                    key={entry.id}
-                    className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50"
-                  >
-                    <span className={`text-xs inline-flex items-center justify-center gap-1.5 ${color || 'text-gray-900 dark:text-gray-100'}`}>
-                      <span className="w-1.5" />
-                      <span className="tabular-nums w-14 text-right">{formatValue(value)}</span>
-                      {arrow ? (
-                        <span className="text-[10px] w-3">{arrow}</span>
+              {/* Combined data cells matching header order */}
+              {dataColumns.map((col) => {
+                if (col.type === 'dexa') {
+                  const dexaValue = getDexaSegmentalValue(col.data, field.key as string);
+                  return (
+                    <td
+                      key={col.data.id}
+                      className="px-3 py-1.5 text-center border-l border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-900/10"
+                    >
+                      {dexaValue !== null ? (
+                        <span className="text-xs tabular-nums font-medium text-amber-700 dark:text-amber-300">
+                          {dexaValue.toFixed(1)}
+                        </span>
                       ) : (
-                        <span className="w-3" />
+                        <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
                       )}
-                    </span>
-                  </td>
-                );
+                    </td>
+                  );
+                } else {
+                  const entry = col.data;
+                  const entryIdx = entries.indexOf(entry);
+                  const value = entry[field.key] as { lb: number; percent: number } | undefined;
+                  const currentLb = value?.lb || 0;
+
+                  const previousEntry = entries[entryIdx + 1];
+                  const previousValue = previousEntry?.[field.key] as { lb: number; percent: number } | undefined;
+                  const previousLb = previousValue?.lb || 0;
+
+                  const { color, arrow } = getSegmentalTrendIndicator(currentLb, previousLb, higherIsBetter);
+
+                  return (
+                    <td
+                      key={entry.id}
+                      className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50"
+                    >
+                      <span className={`text-xs inline-flex items-center justify-center gap-1.5 ${color || 'text-gray-900 dark:text-gray-100'}`}>
+                        <span className="w-1.5" />
+                        <span className="tabular-nums w-14 text-right">{formatValue(value)}</span>
+                        {arrow ? (
+                          <span className="text-[10px] w-3">{arrow}</span>
+                        ) : (
+                          <span className="w-3" />
+                        )}
+                      </span>
+                    </td>
+                  );
+                }
               })}
             </tr>
           );

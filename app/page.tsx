@@ -15,7 +15,20 @@ export default function Home() {
   const [bodyspecScans, setBodyspecScans] = useState<BodyspecScan[]>([]);
   const [bodyspecConnections, setBodyspecConnections] = useState<any[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [hiddenScans, setHiddenScans] = useState<Set<string>>(new Set());
+  const [hiddenScans, setHiddenScans] = useState<Set<string>>(() => {
+    // Load from localStorage on init
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('hiddenBodyspecScans');
+      if (saved) {
+        try {
+          return new Set(JSON.parse(saved));
+        } catch {
+          return new Set();
+        }
+      }
+    }
+    return new Set();
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -30,11 +43,25 @@ export default function Home() {
       } else {
         next.add(scanId);
       }
+      // Persist to localStorage
+      localStorage.setItem('hiddenBodyspecScans', JSON.stringify([...next]));
       return next;
     });
   }, []);
 
   const visibleScans = bodyspecScans.filter(scan => !hiddenScans.has(scan.id));
+
+  // When scans load, if no localStorage exists, auto-hide all but the most recent scan
+  useEffect(() => {
+    if (bodyspecScans.length > 0 && !localStorage.getItem('hiddenBodyspecScans')) {
+      const sortedByDate = [...bodyspecScans].sort((a, b) =>
+        new Date(b.scanDate).getTime() - new Date(a.scanDate).getTime()
+      );
+      const toHide = sortedByDate.slice(1).map(s => s.id);
+      setHiddenScans(new Set(toHide));
+      localStorage.setItem('hiddenBodyspecScans', JSON.stringify(toHide));
+    }
+  }, [bodyspecScans]);
 
   const loadBodyspecData = useCallback(async () => {
     try {
@@ -265,15 +292,9 @@ export default function Home() {
             className="w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <span className="text-amber-600 dark:text-amber-400 text-xl">⚡</span>
               <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">
                 Bodyspec DEXA Integration
               </h2>
-              {visibleScans.length > 0 && (
-                <span className="text-xs bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded">
-                  {visibleScans.length} {visibleScans.length === 1 ? 'scan' : 'scans'}
-                </span>
-              )}
             </div>
             <svg
               className={`w-5 h-5 text-gray-500 transition-transform ${showBodyspecSection ? 'rotate-180' : ''}`}
@@ -342,15 +363,10 @@ export default function Home() {
         </section>
 
         <section className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
             <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">
               BIA Measurements
             </h2>
-            {entries.length > 0 && (
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
-              </span>
-            )}
           </div>
           <DataTable
             entries={entries}

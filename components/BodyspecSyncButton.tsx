@@ -112,13 +112,6 @@ export default function BodyspecSyncButton({
         )}
       </button>
 
-      {/* Status info */}
-      {lastScan && (
-        <span className="text-xs text-gray-500 dark:text-gray-400">
-          Latest: {new Date(lastScan.scanDate).toLocaleDateString()}
-        </span>
-      )}
-
       {/* Error message */}
       {error && (
         <span className="text-xs text-red-600 dark:text-red-400">{error}</span>
