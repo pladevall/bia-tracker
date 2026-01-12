@@ -89,19 +89,19 @@ export const METRIC_DEFINITIONS: MetricDefinition[] = [
   // Core Metrics
   { key: 'weight', label: 'Weight', unit: 'lb', normalRange: { min: 136.6, max: 184.6 }, higherIsBetter: false, category: 'core' },
   { key: 'bodyFatPercentage', label: 'Body Fat %', unit: '%', normalRange: { min: 6, max: 25 }, higherIsBetter: false, category: 'core' },
+  { key: 'bodyFatMass', label: 'Body Fat Mass', unit: 'lb', normalRange: { min: 19.4, max: 39 }, higherIsBetter: false, category: 'core' },
   { key: 'bmi', label: 'BMI', unit: 'kg/m²', normalRange: { min: 18.5, max: 25 }, higherIsBetter: false, category: 'core' },
-  { key: 'visceralFat', label: 'Visceral Fat', unit: '', normalRange: { min: 1, max: 10 }, higherIsBetter: false, category: 'core' },
   { key: 'skeletalMuscle', label: 'Skeletal Muscle', unit: 'lb', normalRange: { min: 69.6, max: 85 }, higherIsBetter: true, category: 'core' },
 
   // Body Composition
   { key: 'bodyWater', label: 'Body Water', unit: 'L', normalRange: { min: 39, max: 50.7 }, higherIsBetter: true, category: 'composition' },
   { key: 'protein', label: 'Protein', unit: 'lb', normalRange: { min: 24.6, max: 30 }, higherIsBetter: true, category: 'composition' },
   { key: 'boneMass', label: 'Bone Mass', unit: 'lb', normalRange: { min: 6.6, max: 11 }, higherIsBetter: true, category: 'composition' },
-  { key: 'bodyFatMass', label: 'Body Fat Mass', unit: 'lb', normalRange: { min: 19.4, max: 39 }, higherIsBetter: false, category: 'composition' },
   { key: 'softLeanMass', label: 'Soft Lean Mass', unit: 'lb', higherIsBetter: true, category: 'composition' },
   { key: 'fatFreeMass', label: 'Fat Free Mass', unit: 'lb', higherIsBetter: true, category: 'composition' },
 
   // Additional Data
+  { key: 'visceralFat', label: 'Visceral Fat', unit: '', normalRange: { min: 1, max: 10 }, higherIsBetter: false, category: 'additional' },
   { key: 'lbm', label: 'LBM (Fat-free Body Weight)', unit: 'lb', normalRange: { min: 124.2, max: 151.8 }, higherIsBetter: true, category: 'additional' },
   { key: 'bmr', label: 'BMR (Basal Metabolic Rate)', unit: 'kcal', normalRange: { min: 1657, max: 1945.6 }, higherIsBetter: true, category: 'additional' },
   { key: 'subcutaneousFatPercentage', label: 'Subcutaneous Fat %', unit: '%', normalRange: { min: 8.6, max: 16.7 }, higherIsBetter: false, category: 'additional' },
@@ -243,6 +243,7 @@ export const BODYSPEC_BIA_MAPPINGS: MetricMapping[] = [
 export const GOAL_ELIGIBLE_METRICS: (keyof BIAEntry)[] = [
   'weight',
   'bodyFatPercentage',
+  'bodyFatMass',
   'skeletalMuscle',
   'muscleLeftArm',
   'muscleRightArm',
