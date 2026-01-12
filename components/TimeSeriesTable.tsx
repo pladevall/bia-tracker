@@ -33,7 +33,7 @@ export function TimeSeriesTable<T>({
             <table className="w-full text-sm">
                 <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-800">
-                        <th className={`sticky left-0 z-10 bg-white dark:bg-gray-900 px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${stickyColumnWidth}`}>
+                        <th className={`sticky left-0 z-30 bg-white dark:bg-gray-900 px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${stickyColumnWidth}`}>
                             {headerLabel}
                         </th>
                         {headerFixedContent}
@@ -99,22 +99,22 @@ const COLOR_STYLES: Record<SectionColor, {
     border: string; // border color
 }> = {
     gray: {
-        labelBg: 'bg-gray-50 dark:bg-gray-900/50',
+        labelBg: 'bg-gray-50 dark:bg-gray-900',
         labelText: 'text-gray-600 dark:text-gray-300',
-        rowBg: 'bg-gray-50 dark:bg-gray-900/50',
-        border: 'border-gray-100 dark:border-gray-800/50',
+        rowBg: 'bg-gray-50 dark:bg-gray-900',
+        border: 'border-gray-100 dark:border-gray-800',
     },
     purple: {
-        labelBg: 'bg-purple-50/50 dark:bg-purple-900/20',
+        labelBg: 'bg-purple-50 dark:bg-purple-900/40',
         labelText: 'text-purple-700 dark:text-purple-300',
-        rowBg: 'bg-purple-50/30 dark:bg-purple-900/10',
-        border: 'border-gray-100 dark:border-gray-800/50',
+        rowBg: 'bg-purple-50/50 dark:bg-purple-900/20', // Row body can stay slightly transparent if desired, but label should be opaque
+        border: 'border-gray-100 dark:border-gray-800',
     },
     orange: {
-        labelBg: 'bg-orange-50/50 dark:bg-orange-900/20',
+        labelBg: 'bg-orange-50 dark:bg-orange-900/40',
         labelText: 'text-orange-700 dark:text-orange-300',
-        rowBg: 'bg-orange-50/30 dark:bg-orange-900/10',
-        border: 'border-gray-100 dark:border-gray-800/50',
+        rowBg: 'bg-orange-50/50 dark:bg-orange-900/20',
+        border: 'border-gray-100 dark:border-gray-800',
     },
     blue: { // For standard content if needed, or filter rows
         labelBg: 'bg-blue-50/50 dark:bg-blue-900/20',

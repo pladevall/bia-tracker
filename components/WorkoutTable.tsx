@@ -108,7 +108,8 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
     const [volumeDisplayMode, setVolumeDisplayMode] = useState<VolumeDisplayMode>('sets');
     const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('WTD');
 
-    const [highlightedRanges, setHighlightedRanges] = useState<{ metricKey: string; current: { start: Date; end: Date }; previous: { start: Date; end: Date } } | null>(null);
+    type HighlightSentiment = 'good' | 'bad' | 'neutral';
+    const [highlightedRanges, setHighlightedRanges] = useState<{ metricKey: string; current: { start: Date; end: Date }; previous: { start: Date; end: Date }; sentiment: HighlightSentiment } | null>(null);
     const [editingGoal, setEditingGoal] = useState<{ metricKey: string; label: string; type?: 'number' | 'duration' | 'pace' } | null>(null);
 
     const goalsMap = useMemo(() => new Map(goals.map(g => [g.metricKey, g.targetValue])), [goals]);
@@ -179,6 +180,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
         }
         return new Date();
     }, [volumePeriod]);
+
+    // Calculate total sets goal (sum of all body part goals)
+    const totalSetsGoal = useMemo(() => {
+        return BODY_PARTS.reduce((sum, part) => {
+            return sum + (goalsMap.get(`lift_sets_${part}`) || 0);
+        }, 0);
+    }, [goalsMap]);
 
     // Calculate volume totals
     const liftingVolume = useMemo(() => {
@@ -396,8 +404,8 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
     const colCount = displayDates.length;
     const stickyWidth = "min-w-[170px]";
 
-    const renderGoalCell = (metricKey: string, label: string, currentValue: number | undefined, type: 'number' | 'duration' | 'pace' = 'number', unit?: string) => {
-        const goalValue = goalsMap.get(metricKey);
+    const renderGoalCell = (metricKey: string, label: string, currentValue: number | undefined, type: 'number' | 'duration' | 'pace' = 'number', unit?: string, explicitGoalValue?: number) => {
+        const goalValue = explicitGoalValue !== undefined ? explicitGoalValue : goalsMap.get(metricKey);
 
         let displayValue = '—';
         let colorClass = 'text-gray-300 dark:text-gray-700';
@@ -467,15 +475,15 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                 displayValue = goalValue.toLocaleString();
             }
         } else {
-            displayValue = '+';
+            displayValue = explicitGoalValue !== undefined ? '—' : '+';
             colorClass = 'text-gray-300 dark:text-gray-600 group-hover:text-blue-500 transition-colors';
-            tooltipContent = 'Set Goal';
+            tooltipContent = explicitGoalValue !== undefined ? 'Add goals to body parts to see total' : 'Set Goal';
         }
 
         return (
             <td
-                className="group px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20 cursor-pointer hover:bg-blue-100/50 dark:hover:bg-blue-900/40"
-                onClick={() => setEditingGoal({ metricKey, label, type })}
+                className={`group px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20 ${explicitGoalValue !== undefined ? '' : 'cursor-pointer hover:bg-blue-100/50 dark:hover:bg-blue-900/40'}`}
+                onClick={() => explicitGoalValue === undefined && setEditingGoal({ metricKey, label, type })}
             >
                 {goalValue ? (
                     <Tooltip content={tooltipContent}>
@@ -499,10 +507,10 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
             }
             headerFixedContent={
                 <>
-                    <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20">
+                    <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800 bg-blue-50 dark:bg-blue-900/40">
                         <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Goal</span>
                     </th>
-                    <th className="px-2 py-2 text-center min-w-[80px] border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20">
+                    <th className="px-2 py-2 text-center min-w-[80px] border-l border-gray-100 dark:border-gray-800 bg-blue-50 dark:bg-blue-900/40">
                         <div className="flex flex-col items-center gap-1">
                             <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Volume</span>
                             <div className="flex gap-0.5">
@@ -521,11 +529,11 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                             </div>
                         </div>
                     </th>
-                    <th className="px-2 py-2 text-center min-w-[70px] border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-800/30">
+                    <th className="px-2 py-2 text-center min-w-[70px] border-l border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
                         <div className="flex flex-col items-center gap-1">
                             <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Trend</span>
                             <div className="flex gap-0.5">
-                                {(['7', '30', '90', 'YTD'] as TrendPeriod[]).map(period => (
+                                {(['WTD', 'MTD', 'QTD', 'YTD'] as TrendPeriod[]).map(period => (
                                     <button
                                         key={period}
                                         onClick={() => setTrendPeriod(period)}
@@ -534,7 +542,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                             : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                                             }`}
                                     >
-                                        {period === 'YTD' ? period : `${period}d`}
+                                        {period}
                                     </button>
                                 ))}
                             </div>
@@ -621,7 +629,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                         label="Sets"
                         fixedContent={
                             <>
-                                {renderGoalCell('lift_sets', 'Target Sets', liftingVolume.totalSets, 'number', 'sets')}
+                                {renderGoalCell('lift_sets', 'Target Sets', liftingVolume.totalSets, 'number', 'sets', totalSetsGoal)}
                                 <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
                                     <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                         {volumeDisplayMode === 'sets'
@@ -641,17 +649,20 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
 
                                         return (
                                             <div
-                                                onMouseEnter={() => setHighlightedRanges({ ...trendData.ranges, metricKey: 'lift_total' })}
+                                                onMouseEnter={() => {
+                                                    const sentiment = color.includes('emerald') ? 'good' : color.includes('red') ? 'bad' : 'neutral';
+                                                    setHighlightedRanges({ ...trendData.ranges, metricKey: 'lift_total', sentiment });
+                                                }}
                                                 onMouseLeave={() => setHighlightedRanges(null)}
                                             >
                                                 <Tooltip content={
                                                     <div className="text-left text-xs">
-                                                        <div className="font-medium mb-1">Change: <span className={color}>{text}</span></div>
+                                                        <div className="font-medium mb-1">Change: <span className={color}>{text} sets</span></div>
                                                         <div className="text-gray-400 mb-2">vs {periodLabels[trendPeriod]}</div>
                                                         <div className="pt-2 border-t border-gray-700 grid grid-cols-2 gap-x-4 gap-y-1">
-                                                            <span className="text-blue-600 dark:text-blue-400 font-medium">Current:</span>
+                                                            <span className={`${color.includes('emerald') ? 'text-emerald-500 dark:text-emerald-500' : color.includes('red') ? 'text-red-500 dark:text-red-500' : 'text-gray-500 dark:text-gray-500'} font-bold`}>Current:</span>
                                                             <span className="text-right font-medium">{formatFn(currentVal)}</span>
-                                                            <span className="text-purple-600 dark:text-purple-400 font-medium">Previous:</span>
+                                                            <span className={`${color.includes('emerald') ? 'text-emerald-300 dark:text-emerald-300' : color.includes('red') ? 'text-red-300 dark:text-red-300' : 'text-gray-300 dark:text-gray-300'} font-medium`}>Previous:</span>
                                                             <span className="text-right font-medium">{formatFn(prevVal)}</span>
                                                         </div>
                                                     </div>
@@ -673,9 +684,19 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                             const isCurrent = isRowHighlighted && highlightedRanges && d >= highlightedRanges.current.start && d <= highlightedRanges.current.end;
                             const isPrevious = isRowHighlighted && highlightedRanges && d >= highlightedRanges.previous.start && d <= highlightedRanges.previous.end;
 
+                            let bgClass = '';
+                            if (isCurrent) {
+                                if (highlightedRanges.sentiment === 'good') bgClass = 'bg-emerald-100/50 dark:bg-emerald-900/30';
+                                else if (highlightedRanges.sentiment === 'bad') bgClass = 'bg-red-100/50 dark:bg-red-900/30';
+                                else bgClass = 'bg-gray-100/50 dark:bg-gray-800/30';
+                            } else if (isPrevious) {
+                                if (highlightedRanges.sentiment === 'good') bgClass = 'bg-emerald-50/50 dark:bg-emerald-900/10';
+                                else if (highlightedRanges.sentiment === 'bad') bgClass = 'bg-red-50/50 dark:bg-red-900/10';
+                                else bgClass = 'bg-gray-50/50 dark:bg-gray-900/10';
+                            }
+
                             return (
-                                <td key={date} className={`px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 ${isCurrent ? 'bg-blue-100/50 dark:bg-blue-900/30' : isPrevious ? 'bg-purple-100/50 dark:bg-purple-900/30' : ''
-                                    }`}>
+                                <td key={date} className={`px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 ${bgClass}`}>
                                     {workout ? (
                                         <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                             {workout.totalSets}
@@ -779,17 +800,20 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                         </td>
                                         <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
                                             <div
-                                                onMouseEnter={() => setHighlightedRanges({ ...trendData.ranges, metricKey: part })}
+                                                onMouseEnter={() => {
+                                                    const sentiment = trendColor.includes('emerald') ? 'good' : trendColor.includes('red') ? 'bad' : 'neutral';
+                                                    setHighlightedRanges({ ...trendData.ranges, metricKey: part, sentiment });
+                                                }}
                                                 onMouseLeave={() => setHighlightedRanges(null)}
                                             >
                                                 <Tooltip content={
                                                     <div className="text-left text-xs">
-                                                        <div className="font-medium mb-1">Change: <span className={trendColor}>{trendText}</span></div>
+                                                        <div className="font-medium mb-1">Change: <span className={trendColor}>{trendText} {volumeDisplayMode === 'volume' ? 'lbs' : 'sets'}</span></div>
                                                         <div className="text-gray-400 mb-2">vs {periodLabels[trendPeriod]}</div>
                                                         <div className="pt-2 border-t border-gray-700 grid grid-cols-2 gap-x-4 gap-y-1">
-                                                            <span className="text-blue-600 dark:text-blue-400 font-medium">Current:</span>
+                                                            <span className={`${trendColor.includes('emerald') ? 'text-emerald-500 dark:text-emerald-500' : trendColor.includes('red') ? 'text-red-500 dark:text-red-500' : 'text-gray-500 dark:text-gray-500'} font-bold`}>Current:</span>
                                                             <span className="text-right font-medium">{volumeDisplayMode === 'volume' ? formatVolume(volumeValue) : volumeValue}</span>
-                                                            <span className="text-purple-600 dark:text-purple-400 font-medium">Previous:</span>
+                                                            <span className={`${trendColor.includes('emerald') ? 'text-emerald-300 dark:text-emerald-300' : trendColor.includes('red') ? 'text-red-300 dark:text-red-300' : 'text-gray-300 dark:text-gray-300'} font-medium`}>Previous:</span>
                                                             <span className="text-right font-medium">
                                                                 {volumeDisplayMode === 'volume'
                                                                     ? formatVolume((trendData.lifting.previous.bodyPartVolume[part] || 0))
@@ -820,9 +844,19 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                     const isCurrent = isRowHighlighted && highlightedRanges && d >= highlightedRanges.current.start && d <= highlightedRanges.current.end;
                                     const isPrevious = isRowHighlighted && highlightedRanges && d >= highlightedRanges.previous.start && d <= highlightedRanges.previous.end;
 
+                                    let bgClass = '';
+                                    if (isCurrent) {
+                                        if (highlightedRanges.sentiment === 'good') bgClass = 'bg-emerald-100/50 dark:bg-emerald-900/30';
+                                        else if (highlightedRanges.sentiment === 'bad') bgClass = 'bg-red-100/50 dark:bg-red-900/30';
+                                        else bgClass = 'bg-gray-100/50 dark:bg-gray-800/30';
+                                    } else if (isPrevious) {
+                                        if (highlightedRanges.sentiment === 'good') bgClass = 'bg-emerald-50/50 dark:bg-emerald-900/10';
+                                        else if (highlightedRanges.sentiment === 'bad') bgClass = 'bg-red-50/50 dark:bg-red-900/10';
+                                        else bgClass = 'bg-gray-50/50 dark:bg-gray-900/10';
+                                    }
+
                                     return (
-                                        <td key={date} className={`px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 ${isCurrent ? 'bg-blue-100/50 dark:bg-blue-900/30' : isPrevious ? 'bg-purple-100/50 dark:bg-purple-900/30' : ''
-                                            }`}>
+                                        <td key={date} className={`px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 ${bgClass}`}>
                                             {displayValue ? (
                                                 <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                                     {volumeDisplayMode === 'volume' ? formatVolume(displayValue) : displayValue}
@@ -867,17 +901,20 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                         const color = diff > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400';
                                         return (
                                             <div
-                                                onMouseEnter={() => setHighlightedRanges({ ...trendData.ranges, metricKey: 'run_miles' })}
+                                                onMouseEnter={() => {
+                                                    const sentiment = color.includes('emerald') ? 'good' : color.includes('red') ? 'bad' : 'neutral';
+                                                    setHighlightedRanges({ ...trendData.ranges, metricKey: 'run_miles', sentiment });
+                                                }}
                                                 onMouseLeave={() => setHighlightedRanges(null)}
                                             >
                                                 <Tooltip content={
                                                     <div className="text-left text-xs">
-                                                        <div className="font-medium mb-1">Change: <span className={color}>{sign}{diff.toFixed(1)}</span></div>
+                                                        <div className="font-medium mb-1">Change: <span className={color}>{sign}{diff.toFixed(1)} miles</span></div>
                                                         <div className="text-gray-400 mb-2">vs {periodLabels[trendPeriod]}</div>
                                                         <div className="pt-2 border-t border-gray-700 grid grid-cols-2 gap-x-4 gap-y-1">
-                                                            <span className="text-blue-600 dark:text-blue-400 font-medium">Current:</span>
+                                                            <span className={`${color.includes('emerald') ? 'text-emerald-500 dark:text-emerald-500' : color.includes('red') ? 'text-red-500 dark:text-red-500' : 'text-gray-500 dark:text-gray-500'} font-bold`}>Current:</span>
                                                             <span className="text-right font-medium">{trendData.running.currentMiles.toFixed(1)}</span>
-                                                            <span className="text-purple-600 dark:text-purple-400 font-medium">Previous:</span>
+                                                            <span className={`${color.includes('emerald') ? 'text-emerald-300 dark:text-emerald-300' : color.includes('red') ? 'text-red-300 dark:text-red-300' : 'text-gray-300 dark:text-gray-300'} font-medium`}>Previous:</span>
                                                             <span className="text-right font-medium">{trendData.running.previousMiles.toFixed(1)}</span>
                                                         </div>
                                                     </div>
@@ -899,9 +936,19 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                             const isCurrent = isRowHighlighted && highlightedRanges && d >= highlightedRanges.current.start && d <= highlightedRanges.current.end;
                             const isPrevious = isRowHighlighted && highlightedRanges && d >= highlightedRanges.previous.start && d <= highlightedRanges.previous.end;
 
+                            let bgClass = '';
+                            if (isCurrent) {
+                                if (highlightedRanges.sentiment === 'good') bgClass = 'bg-emerald-100/50 dark:bg-emerald-900/30';
+                                else if (highlightedRanges.sentiment === 'bad') bgClass = 'bg-red-100/50 dark:bg-red-900/30';
+                                else bgClass = 'bg-gray-100/50 dark:bg-gray-800/30';
+                            } else if (isPrevious) {
+                                if (highlightedRanges.sentiment === 'good') bgClass = 'bg-emerald-50/50 dark:bg-emerald-900/10';
+                                else if (highlightedRanges.sentiment === 'bad') bgClass = 'bg-red-50/50 dark:bg-red-900/10';
+                                else bgClass = 'bg-gray-50/50 dark:bg-gray-900/10';
+                            }
+
                             return (
-                                <td key={date} className={`px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 ${isCurrent ? 'bg-blue-100/50 dark:bg-blue-900/30' : isPrevious ? 'bg-purple-100/50 dark:bg-purple-900/30' : ''
-                                    }`}>
+                                <td key={date} className={`px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 ${bgClass}`}>
                                     {activity ? (
                                         <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                             {activity.distanceMiles.toFixed(1)}

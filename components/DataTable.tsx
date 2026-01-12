@@ -290,53 +290,69 @@ function calculateWeightAtGoalBF(
   latestEntry: BIAEntry,
   comparisonEntry: BIAEntry | null,
   goalBFPercent: number
-): { estimatedWeight: number; leanMassChange: number; fatMassAtGoal: number } | null {
-  if (!comparisonEntry || !goalBFPercent) return null;
-
+): {
+  idealWeight: number;
+  projectedWeight: number;
+  leanMassChangeProjected: number;
+  currentLeanMass: number;
+  fatLossPct: number;
+} | null {
   const currentWeight = latestEntry.weight;
   const currentBF = latestEntry.bodyFatPercentage;
+
+  if (!currentWeight || !currentBF || currentBF <= goalBFPercent) return null;
+
   const currentFatMass = latestEntry.bodyFatMass || (currentWeight * currentBF / 100);
   const currentLeanMass = currentWeight - currentFatMass;
 
-  const prevWeight = comparisonEntry.weight;
-  const prevBF = comparisonEntry.bodyFatPercentage;
-  const prevFatMass = comparisonEntry.bodyFatMass || (prevWeight * prevBF / 100);
-  const prevLeanMass = prevWeight - prevFatMass;
+  // 1. Calculate Ideal Weight (Assuming Constant Lean Mass)
+  // Target: LeanMass / (1 - GoalBF%)
+  const idealWeight = currentLeanMass / (1 - (goalBFPercent / 100));
 
-  if (!currentWeight || !prevWeight || currentBF <= goalBFPercent) return null;
+  // 2. Calculate Trend-based Projection
+  let projectedWeight = idealWeight;
+  let leanMassChangeProjected = 0;
+  let fatLossPct = 100; // Default to 100% (ideal case of no lean mass loss)
 
-  // Calculate rate of change for lean and fat mass
-  const fatMassChange = currentFatMass - prevFatMass;
-  const leanMassChange = currentLeanMass - prevLeanMass;
-  const bfChange = currentBF - prevBF;
+  if (comparisonEntry) {
+    const prevWeight = comparisonEntry.weight;
+    const prevBF = comparisonEntry.bodyFatPercentage;
+    const prevFatMass = comparisonEntry.bodyFatMass || (prevWeight * prevBF / 100);
+    const prevLeanMass = prevWeight - prevFatMass;
 
-  // If BF% isn't decreasing, can't forecast
-  if (bfChange >= 0) return null;
+    const leanMassChange = currentLeanMass - prevLeanMass;
+    const bfChange = currentBF - prevBF;
 
-  // Calculate how much fat needs to be lost to reach goal
-  // At goal: goalBF% = fatMass / (leanMass + fatMass) * 100
-  // Solving for fatMass: fatMass = leanMass * goalBF / (100 - goalBF)
+    // Only project if we have a valid decreasing trend in BF
+    if (bfChange < 0) {
+      const bfToLose = currentBF - goalBFPercent;
+      const bfLostSoFar = prevBF - currentBF;
+      const progressRatio = bfToLose / bfLostSoFar;
 
-  // Estimate lean mass at goal (assume same lean mass change rate continues proportionally)
-  const bfToLose = currentBF - goalBFPercent;
-  const bfLostSoFar = prevBF - currentBF;
-  const progressRatio = bfToLose / bfLostSoFar;
+      leanMassChangeProjected = leanMassChange * progressRatio;
+      const leanMassAtGoal = currentLeanMass + leanMassChangeProjected;
+      const fatMassAtGoal = leanMassAtGoal * goalBFPercent / (100 - goalBFPercent);
+      projectedWeight = leanMassAtGoal + fatMassAtGoal;
 
-  // Project lean mass change (could be positive if gaining muscle while cutting)
-  const projectedLeanMassChange = leanMassChange * progressRatio;
-  const leanMassAtGoal = currentLeanMass + projectedLeanMassChange;
+      // Calculate composition of the trend-based loss
+      const totalWeightLoss = currentWeight - projectedWeight;
+      const totalFatLoss = currentFatMass - fatMassAtGoal;
 
-  // Calculate fat mass needed at goal BF%
-  const fatMassAtGoal = leanMassAtGoal * goalBFPercent / (100 - goalBFPercent);
-  const estimatedWeight = leanMassAtGoal + fatMassAtGoal;
+      if (totalWeightLoss > 0.1) {
+        fatLossPct = Math.min(100, Math.max(0, (totalFatLoss / totalWeightLoss) * 100));
+      }
+    }
+  }
 
-  // Sanity check - weight shouldn't be too extreme
-  if (estimatedWeight < 100 || estimatedWeight > 300) return null;
+  // Sanity check
+  if (idealWeight < 80 || idealWeight > 400) return null;
 
   return {
-    estimatedWeight,
-    leanMassChange: projectedLeanMassChange,
-    fatMassAtGoal
+    idealWeight,
+    projectedWeight,
+    leanMassChangeProjected,
+    currentLeanMass,
+    fatLossPct
   };
 }
 
@@ -458,13 +474,13 @@ export default function DataTable({ entries, goals, bodyspecScans = [], onDelete
         stickyColumnWidth="min-w-[180px]"
         headerFixedContent={
           <>
-            <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20">
+            <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800 bg-blue-50 dark:bg-blue-900/40">
               <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Goal</span>
             </th>
-            <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
+            <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800 bg-blue-50 dark:bg-blue-900/40">
               <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">ETA</span>
             </th>
-            <th className="px-2 py-2 text-center min-w-[70px] border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-800/30">
+            <th className="px-2 py-2 text-center min-w-[70px] border-l border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
               <div className="flex flex-col items-center gap-1">
                 <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Trend</span>
                 <div className="flex gap-0.5">
@@ -744,18 +760,31 @@ function CategorySection({
                       <Tooltip content={
                         metric.key === 'bodyFatPercentage' && goalValue ? (
                           (() => {
-                            const weightProjection = calculateWeightAtGoalBF(latestEntry, comparisonEntry, goalValue);
+                            const projection = calculateWeightAtGoalBF(latestEntry, comparisonEntry, goalValue);
                             return (
                               <div className="text-left">
                                 <div className="font-medium">{forecast.dateText}</div>
-                                {weightProjection && (
+                                {projection && (
                                   <>
                                     <div className="border-t border-gray-600 mt-1 pt-1">
                                       <div className="font-medium">At {goalValue}% Body Fat:</div>
-                                      <div>Est. Weight: {weightProjection.estimatedWeight.toFixed(1)} lb</div>
+                                      <div>Est. Weight: {projection.idealWeight.toFixed(1)} lb</div>
                                       <div className="text-[10px] opacity-80 mt-0.5">
-                                        Lean: {weightProjection.leanMassChange >= 0 ? '+' : ''}{weightProjection.leanMassChange.toFixed(1)} lb projected
+                                        (Assumes {projection.currentLeanMass.toFixed(1)} lb lean mass modeled)
                                       </div>
+
+                                      {/* Only show trend if it implies significant lean mass change (>0.5lb) */}
+                                      {Math.abs(projection.leanMassChangeProjected) > 0.5 && (
+                                        <div className="text-[10px] text-amber-500/90 mt-1 pt-1 border-t border-gray-600/50">
+                                          Current trend: {projection.leanMassChangeProjected > 0 ? '+' : ''}{projection.leanMassChangeProjected.toFixed(1)} lb lean mass
+                                          <br />
+                                          <span className="opacity-75">
+                                            (Loss is {projection.fatLossPct.toFixed(0)}% Fat / {(100 - projection.fatLossPct).toFixed(0)}% Lean)
+                                          </span>
+                                          <br />
+                                          Trend weight: {projection.projectedWeight.toFixed(1)} lb
+                                        </div>
+                                      )}
                                     </div>
                                   </>
                                 )}
