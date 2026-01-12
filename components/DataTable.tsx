@@ -281,6 +281,64 @@ function calculateForecast(
   return { timeText, dateText, isMet: false };
 }
 
+/**
+ * Calculate estimated body weight when target body fat % is reached
+ * Based on current rate of fat loss and lean mass changes
+ */
+function calculateWeightAtGoalBF(
+  latestEntry: BIAEntry,
+  comparisonEntry: BIAEntry | null,
+  goalBFPercent: number
+): { estimatedWeight: number; leanMassChange: number; fatMassAtGoal: number } | null {
+  if (!comparisonEntry || !goalBFPercent) return null;
+
+  const currentWeight = latestEntry.weight;
+  const currentBF = latestEntry.bodyFatPercentage;
+  const currentFatMass = latestEntry.bodyFatMass || (currentWeight * currentBF / 100);
+  const currentLeanMass = currentWeight - currentFatMass;
+
+  const prevWeight = comparisonEntry.weight;
+  const prevBF = comparisonEntry.bodyFatPercentage;
+  const prevFatMass = comparisonEntry.bodyFatMass || (prevWeight * prevBF / 100);
+  const prevLeanMass = prevWeight - prevFatMass;
+
+  if (!currentWeight || !prevWeight || currentBF <= goalBFPercent) return null;
+
+  // Calculate rate of change for lean and fat mass
+  const fatMassChange = currentFatMass - prevFatMass;
+  const leanMassChange = currentLeanMass - prevLeanMass;
+  const bfChange = currentBF - prevBF;
+
+  // If BF% isn't decreasing, can't forecast
+  if (bfChange >= 0) return null;
+
+  // Calculate how much fat needs to be lost to reach goal
+  // At goal: goalBF% = fatMass / (leanMass + fatMass) * 100
+  // Solving for fatMass: fatMass = leanMass * goalBF / (100 - goalBF)
+
+  // Estimate lean mass at goal (assume same lean mass change rate continues proportionally)
+  const bfToLose = currentBF - goalBFPercent;
+  const bfLostSoFar = prevBF - currentBF;
+  const progressRatio = bfToLose / bfLostSoFar;
+
+  // Project lean mass change (could be positive if gaining muscle while cutting)
+  const projectedLeanMassChange = leanMassChange * progressRatio;
+  const leanMassAtGoal = currentLeanMass + projectedLeanMassChange;
+
+  // Calculate fat mass needed at goal BF%
+  const fatMassAtGoal = leanMassAtGoal * goalBFPercent / (100 - goalBFPercent);
+  const estimatedWeight = leanMassAtGoal + fatMassAtGoal;
+
+  // Sanity check - weight shouldn't be too extreme
+  if (estimatedWeight < 100 || estimatedWeight > 300) return null;
+
+  return {
+    estimatedWeight,
+    leanMassChange: projectedLeanMassChange,
+    fatMassAtGoal
+  };
+}
+
 function formatGapTooltip(currentValue: number, goalValue: number, higherIsBetter: boolean, unit: string): React.ReactNode {
   const gap = goalValue - currentValue;
 
@@ -709,7 +767,29 @@ function CategorySection({
               </td>
               <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/20 dark:bg-blue-900/5">
                 {forecast ? (
-                  <Tooltip content={forecast.dateText}>
+                  <Tooltip content={
+                    metric.key === 'bodyFatPercentage' && goalValue ? (
+                      (() => {
+                        const weightProjection = calculateWeightAtGoalBF(latestEntry, comparisonEntry, goalValue);
+                        return (
+                          <div className="text-left">
+                            <div className="font-medium">{forecast.dateText}</div>
+                            {weightProjection && (
+                              <>
+                                <div className="border-t border-gray-600 mt-1 pt-1">
+                                  <div className="font-medium">At {goalValue}% Body Fat:</div>
+                                  <div>Est. Weight: {weightProjection.estimatedWeight.toFixed(1)} lb</div>
+                                  <div className="text-[10px] opacity-80 mt-0.5">
+                                    Lean: {weightProjection.leanMassChange >= 0 ? '+' : ''}{weightProjection.leanMassChange.toFixed(1)} lb projected
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()
+                    ) : forecast.dateText
+                  }>
                     <span className={`text-xs tabular-nums font-medium cursor-help ${forecast.isMet ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-300'}`}>
                       {forecast.timeText}
                     </span>
