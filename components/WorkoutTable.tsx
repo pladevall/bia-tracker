@@ -254,7 +254,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                                     : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                                     }`}
                             >
-                                {type === 'run' ? '🏃 Run' : type === 'lifting' ? '🏋️ Lift' : 'All'}
+                                {type === 'run' ? 'Run' : type === 'lifting' ? 'Lift' : 'All'}
                             </button>
                         ))}
                     </div>
@@ -268,7 +268,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
             {workoutType !== 'run' && liftingWorkouts.length > 0 && (
                 <>
                     <SectionHeaderRow
-                        label="🏋️ Lifting"
+                        label="Lifting"
                         color="purple"
                         columnCount={colCount}
                         fixedCellsCount={1}
@@ -278,7 +278,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                         label="Sets"
                         fixedContent={
                             <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
+                                <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                     {liftingVolume.totalSets}
                                 </span>
                             </td>
@@ -289,9 +289,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                             const workout = liftingByDate.get(date);
                             return (
                                 <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
-                                    <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
-                                        {workout ? workout.totalSets : '—'}
-                                    </span>
+                                    {workout ? (
+                                        <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                            {workout.totalSets}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    )}
                                 </td>
                             );
                         })}
@@ -301,7 +305,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                         label="Duration"
                         fixedContent={
                             <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
+                                <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                     {formatDuration(liftingVolume.totalDuration)}
                                 </span>
                             </td>
@@ -312,9 +316,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                             const workout = liftingByDate.get(date);
                             return (
                                 <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
-                                    <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
-                                        {workout ? formatDuration(workout.durationSeconds) : '—'}
-                                    </span>
+                                    {workout ? (
+                                        <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                            {formatDuration(workout.durationSeconds)}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    )}
                                 </td>
                             );
                         })}
@@ -324,7 +332,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                         label="Reps"
                         fixedContent={
                             <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
+                                <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                     {liftingVolume.totalReps.toLocaleString()}
                                 </span>
                             </td>
@@ -335,9 +343,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                             const workout = liftingByDate.get(date);
                             return (
                                 <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
-                                    <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
-                                        {workout ? workout.totalReps.toLocaleString() : '—'}
-                                    </span>
+                                    {workout ? (
+                                        <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                            {workout.totalReps.toLocaleString()}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    )}
                                 </td>
                             );
                         })}
@@ -349,7 +361,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                             label={<span className="capitalize">{part}</span>}
                             fixedContent={
                                 <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                    <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
+                                    <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                         {liftingVolume.bodyPartTotals[part] || '—'}
                                     </span>
                                 </td>
@@ -361,9 +373,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                                 const sets = workout?.bodyParts?.[part]?.sets;
                                 return (
                                     <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
-                                        <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
-                                            {sets ? sets : '—'}
-                                        </span>
+                                        {sets ? (
+                                            <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                                {sets}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        )}
                                     </td>
                                 );
                             })}
@@ -376,7 +392,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
             {workoutType !== 'lifting' && runningActivities.length > 0 && (
                 <>
                     <SectionHeaderRow
-                        label="🏃 Running"
+                        label="Running"
                         color="orange"
                         columnCount={colCount}
                         fixedCellsCount={1}
@@ -386,7 +402,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                         label="Miles"
                         fixedContent={
                             <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
+                                <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                     {runningVolume.totalMiles.toFixed(1)}
                                 </span>
                             </td>
@@ -397,9 +413,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                             const activity = runningByDate.get(date);
                             return (
                                 <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
-                                    <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
-                                        {activity ? activity.distanceMiles.toFixed(1) : '—'}
-                                    </span>
+                                    {activity ? (
+                                        <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                            {activity.distanceMiles.toFixed(1)}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    )}
                                 </td>
                             );
                         })}
@@ -409,7 +429,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                         label="Duration"
                         fixedContent={
                             <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
+                                <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                     {formatDuration(runningVolume.totalDuration)}
                                 </span>
                             </td>
@@ -420,9 +440,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                             const activity = runningByDate.get(date);
                             return (
                                 <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
-                                    <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
-                                        {activity ? formatDuration(activity.durationSeconds) : '—'}
-                                    </span>
+                                    {activity ? (
+                                        <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                            {formatDuration(activity.durationSeconds)}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    )}
                                 </td>
                             );
                         })}
@@ -441,9 +465,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                             const activity = runningByDate.get(date);
                             return (
                                 <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
-                                    <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
-                                        {activity?.averagePaceSeconds ? `${formatPace(activity.averagePaceSeconds)}/mi` : '—'}
-                                    </span>
+                                    {activity?.averagePaceSeconds ? (
+                                        <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                            {formatPace(activity.averagePaceSeconds)}/mi
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    )}
                                 </td>
                             );
                         })}
@@ -465,16 +493,20 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                                 if (!activity || activity.distanceMiles < milestone.miles * 0.95) {
                                     return (
                                         <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
-                                            <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">—</span>
+                                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                         </td>
                                     );
                                 }
                                 const time = getTimeAtMile(activity.splits, milestone.miles);
                                 return (
                                     <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
-                                        <span className="text-xs tabular-nums font-medium text-gray-900 dark:text-gray-100">
-                                            {time ? formatDuration(Math.round(time)) : '—'}
-                                        </span>
+                                        {time ? (
+                                            <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                                {formatDuration(Math.round(time))}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        )}
                                     </td>
                                 );
                             })}

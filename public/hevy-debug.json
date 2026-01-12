@@ -1,0 +1,237 @@
+{
+  "timestamp": "2026-01-12T05:57:42.842Z",
+  "count": 192,
+  "firstWorkoutRaw": {
+    "id": "507e12ce-86f4-4fba-b59e-b3cfc6f7161c",
+    "title": "Push: Chest + Shoulders + Triceps",
+    "routine_id": "14e4ef10-1417-482a-a9e4-638f5af8427d",
+    "description": "",
+    "start_time": "2026-01-11T00:07:40+00:00",
+    "end_time": "2026-01-11T01:02:16+00:00",
+    "updated_at": "2026-01-11T01:02:24.120Z",
+    "created_at": "2026-01-11T01:02:24.120Z",
+    "exercises": [
+      {
+        "index": 0,
+        "title": "Chest Fly (Machine)",
+        "notes": "",
+        "exercise_template_id": "78683336",
+        "superset_id": null,
+        "sets": [
+          {
+            "index": 0,
+            "type": "normal",
+            "weight_kg": 72.57486550970236,
+            "reps": 10,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "title": "Bench Press Wide (Machine)",
+        "notes": "",
+        "exercise_template_id": "e6cb1d72-c6e3-41c8-828c-da9a63f8993a",
+        "superset_id": null,
+        "sets": [
+          {
+            "index": 0,
+            "type": "normal",
+            "weight_kg": 81.64672369841516,
+            "reps": 10,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "title": "Incline Bench Press (Barbell)",
+        "notes": "",
+        "exercise_template_id": "50DFDFAB",
+        "superset_id": null,
+        "sets": [
+          {
+            "index": 0,
+            "type": "normal",
+            "weight_kg": 47.62725549074217,
+            "reps": 10,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          },
+          {
+            "index": 1,
+            "type": "normal",
+            "weight_kg": 52.16318458509857,
+            "reps": 10,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "title": "Incline Bench Press (Dumbbell)",
+        "notes": "",
+        "exercise_template_id": "07B38369",
+        "superset_id": null,
+        "sets": [
+          {
+            "index": 0,
+            "type": "normal",
+            "weight_kg": 49.895220037920375,
+            "reps": 10,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "title": "Incline Chest Fly (Dumbbell)",
+        "notes": "",
+        "exercise_template_id": "D3E2AB55",
+        "superset_id": null,
+        "sets": [
+          {
+            "index": 0,
+            "type": "normal",
+            "weight_kg": 31.75150366049478,
+            "reps": 10,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          }
+        ]
+      },
+      {
+        "index": 5,
+        "title": "Shoulder Press (Dumbbell)",
+        "notes": "",
+        "exercise_template_id": "878CD1D0",
+        "superset_id": null,
+        "sets": [
+          {
+            "index": 0,
+            "type": "normal",
+            "weight_kg": 36.28743275485118,
+            "reps": 10,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          },
+          {
+            "index": 1,
+            "type": "normal",
+            "weight_kg": 36.28743275485118,
+            "reps": 10,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          }
+        ]
+      },
+      {
+        "index": 6,
+        "title": "Single Arm Lateral Raise (Cable)",
+        "notes": "",
+        "exercise_template_id": "DE68C825",
+        "superset_id": null,
+        "sets": [
+          {
+            "index": 0,
+            "type": "normal",
+            "weight_kg": 13.607787283069193,
+            "reps": 10,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          },
+          {
+            "index": 1,
+            "type": "normal",
+            "weight_kg": 13.607787283069193,
+            "reps": 10,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          }
+        ]
+      },
+      {
+        "index": 7,
+        "title": "Shoulder Press (Machine Plates)",
+        "notes": "",
+        "exercise_template_id": "059E835D",
+        "superset_id": null,
+        "sets": [
+          {
+            "index": 0,
+            "type": "normal",
+            "weight_kg": 63.50300732098956,
+            "reps": 10,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          },
+          {
+            "index": 1,
+            "type": "normal",
+            "weight_kg": 49.895220037920375,
+            "reps": 10,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          }
+        ]
+      },
+      {
+        "index": 8,
+        "title": "Upright Row (Barbell)",
+        "notes": "",
+        "exercise_template_id": "7AB9A362",
+        "superset_id": null,
+        "sets": [
+          {
+            "index": 0,
+            "type": "normal",
+            "weight_kg": 40.82336184920758,
+            "reps": 8,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          },
+          {
+            "index": 1,
+            "type": "normal",
+            "weight_kg": 40.82336184920758,
+            "reps": 10,
+            "distance_meters": null,
+            "duration_seconds": null,
+            "rpe": null,
+            "custom_metric": null
+          }
+        ]
+      }
+    ]
+  }
+}
