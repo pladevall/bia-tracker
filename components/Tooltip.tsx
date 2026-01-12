@@ -29,9 +29,8 @@ export default function Tooltip({ content, children }: TooltipProps) {
       {children}
       {visible && (
         <span
-          className={`absolute z-50 px-2 py-1 text-xs text-white bg-gray-900 dark:bg-gray-700 rounded shadow-lg whitespace-nowrap left-1/2 -translate-x-1/2 ${
-            position === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
-          }`}
+          className={`absolute z-50 px-2 py-1.5 text-xs text-white bg-gray-900 dark:bg-gray-700 rounded shadow-lg min-w-max max-w-[200px] left-1/2 -translate-x-1/2 ${position === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+            }`}
         >
           {content}
         </span>

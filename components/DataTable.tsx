@@ -641,7 +641,7 @@ function CategorySection({
         ))}
       </tr>
       {isExpanded &&
-        metrics.map((metric) => {
+        metrics.flatMap((metric) => {
           // Calculate trend for this metric
           const latestValue = typeof latestEntry?.[metric.key] === 'number' ? latestEntry[metric.key] as number : 0;
           const comparisonValue = comparisonEntry && typeof comparisonEntry[metric.key] === 'number'
@@ -670,7 +670,7 @@ function CategorySection({
             metric.higherIsBetter ?? true
           );
 
-          return (
+          const metricRow = (
             <tr
               key={metric.key}
               className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
@@ -784,103 +784,144 @@ function CategorySection({
               })}
             </tr>
           );
+
+          // Insert Fat-to-Lean Change Ratio row after bodyFatMass
+          if (metric.key === 'bodyFatMass' && category === 'core' && entries.length > 0) {
+            const fatLeanRow = (
+              <tr key="fat-lean-ratio" className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                <td className="sticky left-0 z-10 bg-white dark:bg-gray-900 px-4 py-1.5 text-gray-600 dark:text-gray-300 min-w-[180px]">
+                  <span className="text-xs inline-flex items-center gap-1">
+                    Fat-to-Lean Δ Ratio
+                    <Tooltip content="Ideal: 50-100% when losing weight (losing mostly fat), 0-50% when gaining (gaining mostly lean)">
+                      <svg className="w-3 h-3 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </Tooltip>
+                  </span>
+                </td>
+                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
+                  <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                </td>
+                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/20 dark:bg-blue-900/5">
+                  <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                </td>
+                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-800/30">
+                  <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                </td>
+                {dataColumns.map((col) => {
+                  if (col.type === 'dexa') {
+                    return (
+                      <td
+                        key={`fat-lean-${col.data.id}`}
+                        className="px-3 py-1.5 text-center border-l border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-900/10"
+                      >
+                        <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
+                      </td>
+                    );
+                  } else {
+                    const entry = col.data;
+                    const entryIdx = entries.indexOf(entry);
+                    const previousEntry = entries[entryIdx + 1];
+                    const fatShareData = calculateFatShare(entry, previousEntry);
+
+                    // No previous entry to compare
+                    if (fatShareData.value === null && fatShareData.isGood === null) {
+                      return (
+                        <td
+                          key={`fat-lean-${entry.id}`}
+                          className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50"
+                        >
+                          <span className="text-xs inline-flex items-center justify-center gap-1.5">
+                            <span className="w-1.5" />
+                            <span className="tabular-nums w-14 text-right text-gray-300 dark:text-gray-600">—</span>
+                            <span className="w-3" />
+                          </span>
+                        </td>
+                      );
+                    }
+
+                    // Determine range status for the dot
+                    // Good ranges: losing weight = 50-100%, gaining weight = 0-50%
+                    let dotColor = '';
+                    let rangeLabel = '';
+                    if (fatShareData.value !== null) {
+                      if (fatShareData.weightChange < 0) {
+                        // Losing weight
+                        if (fatShareData.value >= 50 && fatShareData.value <= 100) {
+                          dotColor = 'bg-emerald-500';
+                          rangeLabel = 'Ideal range (50-100% when losing)';
+                        } else if (fatShareData.value >= 0 && fatShareData.value < 50) {
+                          dotColor = 'bg-amber-500';
+                          rangeLabel = 'Below ideal (losing too much lean)';
+                        } else {
+                          dotColor = 'bg-red-500';
+                          rangeLabel = 'Outside normal range';
+                        }
+                      } else {
+                        // Gaining weight
+                        if (fatShareData.value >= 0 && fatShareData.value <= 50) {
+                          dotColor = 'bg-emerald-500';
+                          rangeLabel = 'Ideal range (0-50% when gaining)';
+                        } else if (fatShareData.value > 50 && fatShareData.value <= 100) {
+                          dotColor = 'bg-amber-500';
+                          rangeLabel = 'Above ideal (gaining too much fat)';
+                        } else {
+                          dotColor = 'bg-red-500';
+                          rangeLabel = 'Outside normal range';
+                        }
+                      }
+                    }
+
+                    const colorClass = fatShareData.isGood === true
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : fatShareData.isGood === false
+                        ? 'text-red-500 dark:text-red-400'
+                        : 'text-gray-600 dark:text-gray-300';
+
+                    const displayValue = fatShareData.value !== null
+                      ? `${fatShareData.value.toFixed(0)}%`
+                      : (fatShareData.isGood !== null ? '↔' : '—');
+
+                    const tooltipContent = (
+                      <div className="text-left">
+                        <div className="font-medium mb-1">Weight Change Breakdown</div>
+                        <div>Fat: {fatShareData.fatChange >= 0 ? '+' : ''}{fatShareData.fatChange.toFixed(1)} lb</div>
+                        <div>Lean: {fatShareData.leanChange >= 0 ? '+' : ''}{fatShareData.leanChange.toFixed(1)} lb</div>
+                        <div className="border-t border-gray-600 mt-1 pt-1">
+                          Total: {fatShareData.weightChange >= 0 ? '+' : ''}{fatShareData.weightChange.toFixed(1)} lb
+                        </div>
+                      </div>
+                    );
+
+                    return (
+                      <td
+                        key={`fat-lean-${entry.id}`}
+                        className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50"
+                      >
+                        <span className={`text-xs inline-flex items-center justify-center gap-1.5 ${colorClass}`}>
+                          {dotColor ? (
+                            <Tooltip content={rangeLabel}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${dotColor} cursor-help flex-shrink-0`} />
+                            </Tooltip>
+                          ) : (
+                            <span className="w-1.5" />
+                          )}
+                          <Tooltip content={tooltipContent}>
+                            <span className="tabular-nums w-14 text-right cursor-help">{displayValue}</span>
+                          </Tooltip>
+                          <span className="w-3" />
+                        </span>
+                      </td>
+                    );
+                  }
+                })}
+              </tr>
+            );
+            return [metricRow, fatLeanRow];
+          }
+
+          return [metricRow];
         })}
-      {/* Fat Share of Weight Change - only show in core section */}
-      {isExpanded && category === 'core' && entries.length > 0 && (
-        <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors bg-gradient-to-r from-purple-50/30 to-transparent dark:from-purple-900/10">
-          <td className="sticky left-0 z-10 bg-white dark:bg-gray-900 px-4 py-1.5 text-gray-600 dark:text-gray-300 min-w-[180px]">
-            <span className="text-xs inline-flex items-center gap-1">
-              <span className="text-purple-600 dark:text-purple-400">⚡</span>
-              Fat Share of Δ
-              <Tooltip content={
-                <div className="text-left">
-                  <div className="font-medium mb-1">Fat Share of Weight Change</div>
-                  <div>Shows what % of weight change came from fat.</div>
-                  <div className="mt-1 text-xs opacity-80">
-                    • Losing: Higher % = better (losing fat)<br />
-                    • Gaining: Lower % = better (gaining lean)
-                  </div>
-                </div>
-              }>
-                <svg className="w-3 h-3 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </Tooltip>
-            </span>
-          </td>
-          <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
-          </td>
-          <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/20 dark:bg-blue-900/5">
-            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
-          </td>
-          <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-800/30">
-            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
-          </td>
-          {dataColumns.map((col) => {
-            if (col.type === 'dexa') {
-              return (
-                <td
-                  key={col.data.id}
-                  className="px-3 py-1.5 text-center border-l border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-900/10"
-                >
-                  <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
-                </td>
-              );
-            } else {
-              const entry = col.data;
-              const entryIdx = entries.indexOf(entry);
-              const previousEntry = entries[entryIdx + 1];
-              const fatShareData = calculateFatShare(entry, previousEntry);
-
-              if (fatShareData.value === null && fatShareData.isGood === null) {
-                return (
-                  <td
-                    key={entry.id}
-                    className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50"
-                  >
-                    <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
-                  </td>
-                );
-              }
-
-              const colorClass = fatShareData.isGood === true
-                ? 'text-emerald-600 dark:text-emerald-400'
-                : fatShareData.isGood === false
-                  ? 'text-red-500 dark:text-red-400'
-                  : 'text-gray-600 dark:text-gray-300';
-
-              const displayValue = fatShareData.value !== null
-                ? `${fatShareData.value.toFixed(0)}%`
-                : (fatShareData.isGood !== null ? '↔' : '—');
-
-              const tooltipContent = (
-                <div className="text-left">
-                  <div className="font-medium mb-1">Weight Change Breakdown</div>
-                  <div>Fat: {fatShareData.fatChange >= 0 ? '+' : ''}{fatShareData.fatChange.toFixed(1)} lb</div>
-                  <div>Lean: {fatShareData.leanChange >= 0 ? '+' : ''}{fatShareData.leanChange.toFixed(1)} lb</div>
-                  <div className="border-t border-gray-600 mt-1 pt-1">
-                    Total: {fatShareData.weightChange >= 0 ? '+' : ''}{fatShareData.weightChange.toFixed(1)} lb
-                  </div>
-                </div>
-              );
-
-              return (
-                <td
-                  key={entry.id}
-                  className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50"
-                >
-                  <Tooltip content={tooltipContent}>
-                    <span className={`text-xs tabular-nums font-medium cursor-help ${colorClass}`}>
-                      {displayValue}
-                    </span>
-                  </Tooltip>
-                </td>
-              );
-            }
-          })}
-        </tr>
-      )}
     </>
   );
 }
