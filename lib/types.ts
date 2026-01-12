@@ -241,6 +241,7 @@ export const BODYSPEC_BIA_MAPPINGS: MetricMapping[] = [
 
 // Metrics that can have goals
 export const GOAL_ELIGIBLE_METRICS: (keyof BIAEntry)[] = [
+  'weight',
   'bodyFatPercentage',
   'skeletalMuscle',
   'muscleLeftArm',

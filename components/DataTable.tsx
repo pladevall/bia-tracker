@@ -260,8 +260,7 @@ function getDexaValueForMetric(scan: BodyspecScan, metricKey: string): number | 
       return data.totalBodyFat;
     case 'boneMass':
       return data.boneMineralContent ? data.boneMineralContent / 453.592 : null; // grams to lb
-    case 'visceralFat':
-      return data.visceralAdiposeTissue; // VAT in cm²
+    // Note: visceralFat is intentionally not mapped - DEXA reports VAT in cm² while BIA uses a score (1-59)
     default:
       return null;
   }
