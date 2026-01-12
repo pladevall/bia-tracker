@@ -775,9 +775,11 @@ function CategorySection({
                     )}
                   </td>
                   <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-800/30">
-                    <span className={`text-xs tabular-nums font-medium ${trendColor}`}>
-                      {trendText}
-                    </span>
+                    <Tooltip content={comparisonEntry ? `Change since ${formatDate(comparisonEntry.date)}` : 'Trend'}>
+                      <span className={`text-xs tabular-nums font-medium cursor-help ${trendColor}`}>
+                        {trendText}
+                      </span>
+                    </Tooltip>
                   </td>
                 </>
               }
@@ -1131,9 +1133,11 @@ function SegmentalSection({
                     )}
                   </td>
                   <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-800/30">
-                    <span className={`text-xs tabular-nums font-medium ${trendColor}`}>
-                      {trendText}
-                    </span>
+                    <Tooltip content={comparisonEntry ? `Change since ${formatDate(comparisonEntry.date)}` : 'Trend'}>
+                      <span className={`text-xs tabular-nums font-medium cursor-help ${trendColor}`}>
+                        {trendText}
+                      </span>
+                    </Tooltip>
                   </td>
                 </>
               }

@@ -55,7 +55,7 @@ export default function IntegrationTabs({
     liftingWorkouts,
     onWorkoutSync,
 }: IntegrationTabsProps) {
-    const [isExpanded, setIsExpanded] = useState(true);
+    const [isExpanded, setIsExpanded] = useState(false);
     const [activeTab, setActiveTab] = useState<IntegrationType>('bia-scale');
 
     const tabs: { id: IntegrationType; label: string; isConnected?: boolean }[] = [

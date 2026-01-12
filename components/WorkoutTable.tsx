@@ -223,7 +223,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
             totalDuration += a.durationSeconds;
         });
 
-        return { totalMiles, totalDuration };
+        const averagePace = totalMiles > 0 ? totalDuration / totalMiles : 0;
+
+        return { totalMiles, totalDuration, averagePace };
     }, [runningActivities, volumeStartDate, volumeEndDate]);
 
     // Calculate trend data (compare current period vs previous period)
@@ -314,6 +316,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
             bodyPartSetsDiff,
             bodyPartVolumeDiff,
             milesDiff,
+            comparisonDate: previousStart,
+            // Raw stats for tooltip
+            lifting: { current, previous },
+            running: {
+                currentMiles,
+                previousMiles,
+            }
         };
     }, [liftingWorkouts, runningActivities, trendPeriod]);
 
@@ -350,14 +359,69 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
     const colCount = displayDates.length;
     const stickyWidth = "min-w-[170px]";
 
-    const renderGoalCell = (metricKey: string, label: string, type: 'number' | 'duration' | 'pace' = 'number', unit?: string) => {
+    const renderGoalCell = (metricKey: string, label: string, currentValue: number | undefined, type: 'number' | 'duration' | 'pace' = 'number', unit?: string) => {
         const goalValue = goalsMap.get(metricKey);
 
         let displayValue = '—';
         let colorClass = 'text-gray-300 dark:text-gray-700';
+        let tooltipContent: React.ReactNode = null;
 
         if (goalValue) {
-            colorClass = 'text-blue-600 dark:text-blue-400 font-medium';
+            // Determine progress status and color
+            if (currentValue !== undefined && currentValue !== null) {
+                const isPace = type === 'pace';
+                // For pace, lower is better. For others, higher is better.
+                let ratio = isPace
+                    ? (currentValue > 0 ? goalValue / currentValue : 0) // If current=0 (no run), ratio 0. If current is really fast (small), ratio high.
+                    : currentValue / goalValue;
+
+                // Correction for pace: actually we want to check if current <= goal.
+                // Let's use simple comparisons instead of ratio for status
+                let isMet = false;
+                let isFar = false;
+
+                if (isPace) {
+                    // Goal 8:00 (480s), Current 9:00 (540s) -> Not met.
+                    // Met if current <= goal
+                    if (currentValue > 0) {
+                        isMet = currentValue <= goalValue;
+                        isFar = currentValue > goalValue * 1.15; // >15% slower
+                    }
+                } else {
+                    isMet = currentValue >= goalValue;
+                    isFar = currentValue < goalValue * 0.7; // <70% complete
+                }
+
+                if (isMet) {
+                    colorClass = 'text-emerald-600 dark:text-emerald-400 font-bold';
+                } else if (isFar) {
+                    colorClass = 'text-red-500 dark:text-red-400';
+                } else {
+                    colorClass = 'text-amber-600 dark:text-amber-400'; // Close/Progressing
+                }
+
+                // Calculate Gap
+                const gap = Math.abs(goalValue - currentValue);
+                let gapStr = '';
+                if (type === 'duration') gapStr = formatDuration(gap);
+                else if (type === 'pace') gapStr = formatPace(gap);
+                else gapStr = gap.toLocaleString(undefined, { maximumFractionDigits: 1 });
+
+                const gapLabel = isMet ? 'Exceeded by' : 'Gap';
+                tooltipContent = (
+                    <div className="flex flex-col gap-0.5 text-xs">
+                        <span><span className="font-bold">Goal:</span> {type === 'duration' ? formatDuration(goalValue) : type === 'pace' ? formatPace(goalValue) : goalValue.toLocaleString()} {unit}</span>
+                        <span><span className="font-bold">Current:</span> {type === 'duration' ? formatDuration(currentValue) : type === 'pace' ? formatPace(currentValue) : currentValue.toLocaleString(undefined, { maximumFractionDigits: 1 })} {unit}</span>
+                        <span><span className="font-bold">{gapLabel}:</span> {gapStr} {unit}</span>
+                    </div>
+                );
+            } else {
+                colorClass = 'text-blue-600 dark:text-blue-400 font-medium';
+                tooltipContent = (
+                    <span><span className="font-bold">Goal:</span> {type === 'duration' ? formatDuration(goalValue) : type === 'pace' ? formatPace(goalValue) : goalValue.toLocaleString()}</span>
+                );
+            }
+
             if (type === 'duration') {
                 displayValue = formatDuration(goalValue);
             } else if (type === 'pace') {
@@ -368,6 +432,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
         } else {
             displayValue = '+';
             colorClass = 'text-gray-300 dark:text-gray-600 group-hover:text-blue-500 transition-colors';
+            tooltipContent = 'Set Goal';
         }
 
         return (
@@ -376,7 +441,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                 onClick={() => setEditingGoal({ metricKey, label, type })}
             >
                 {goalValue ? (
-                    <Tooltip content={unit ? `Goal: ${displayValue} ${unit}` : `Goal: ${displayValue}`}>
+                    <Tooltip content={tooltipContent}>
                         <span className={`text-xs tabular-nums ${colorClass}`}>
                             {displayValue}
                         </span>
@@ -507,7 +572,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                         label="Sets"
                         fixedContent={
                             <>
-                                {renderGoalCell('lift_sets', 'Target Sets', 'number', 'sets')}
+                                {renderGoalCell('lift_sets', 'Target Sets', liftingVolume.totalSets, 'number', 'sets')}
                                 <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
                                     <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                         {volumeDisplayMode === 'sets'
@@ -519,7 +584,11 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                     {(() => {
                                         const diff = volumeDisplayMode === 'sets' ? trendData.setsDiff : trendData.volumeDiff;
                                         const { text, color } = formatTrendValue(diff, volumeDisplayMode === 'volume');
-                                        return <span className={`text-xs tabular-nums font-medium ${color}`}>{text}</span>;
+                                        return (
+                                            <Tooltip content={`Change since ${trendData.comparisonDate.toLocaleDateString()}`}>
+                                                <span className={`text-xs tabular-nums font-medium cursor-help ${color}`}>{text}</span>
+                                            </Tooltip>
+                                        );
                                     })()}
                                 </td>
                             </>
@@ -546,7 +615,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                         label="Duration"
                         fixedContent={
                             <>
-                                {renderGoalCell('lift_duration', 'Target Duration', 'duration')}
+                                {renderGoalCell('lift_duration', 'Target Duration', liftingVolume.totalDuration, 'duration')}
                                 <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
                                     <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                         {formatDuration(liftingVolume.totalDuration)}
@@ -579,7 +648,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                         label="Reps"
                         fixedContent={
                             <>
-                                {renderGoalCell('lift_reps', 'Target Reps', 'number', 'reps')}
+                                {renderGoalCell('lift_reps', 'Target Reps', liftingVolume.totalReps, 'number', 'reps')}
                                 <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
                                     <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                         {liftingVolume.totalReps.toLocaleString()}
@@ -623,7 +692,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                 label={<span className="capitalize">{part}</span>}
                                 fixedContent={
                                     <>
-                                        {renderGoalCell(`lift_sets_${part}`, `${part.charAt(0).toUpperCase() + part.slice(1)} Sets`, 'number', 'sets')}
+                                        {renderGoalCell(`lift_sets_${part}`, `${part.charAt(0).toUpperCase() + part.slice(1)} Sets`, volumeValue, 'number', 'sets')}
                                         <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
                                             <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                                 {volumeValue
@@ -632,9 +701,11 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                             </span>
                                         </td>
                                         <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
-                                            <span className={`text-xs tabular-nums font-medium ${trendColor}`}>
-                                                {trendText}
-                                            </span>
+                                            <Tooltip content={`Change since ${trendData.comparisonDate.toLocaleDateString()}`}>
+                                                <span className={`text-xs tabular-nums font-medium cursor-help ${trendColor}`}>
+                                                    {trendText}
+                                                </span>
+                                            </Tooltip>
                                         </td>
                                     </>
                                 }
@@ -678,7 +749,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                         label="Miles"
                         fixedContent={
                             <>
-                                {renderGoalCell('run_miles', 'Target Miles', 'number', 'mi')}
+                                {renderGoalCell('run_miles', 'Target Miles', runningVolume.totalMiles, 'number', 'mi')}
                                 <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
                                     <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                         {runningVolume.totalMiles.toFixed(1)}
@@ -690,7 +761,11 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                         if (Math.abs(diff) < 0.1) return <span className="text-xs text-gray-400">—</span>;
                                         const sign = diff > 0 ? '+' : '';
                                         const color = diff > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400';
-                                        return <span className={`text-xs tabular-nums font-medium ${color}`}>{sign}{diff.toFixed(1)}</span>;
+                                        return (
+                                            <Tooltip content={`Change since ${trendData.comparisonDate.toLocaleDateString()}`}>
+                                                <span className={`text-xs tabular-nums font-medium cursor-help ${color}`}>{sign}{diff.toFixed(1)}</span>
+                                            </Tooltip>
+                                        );
                                     })()}
                                 </td>
                             </>
@@ -717,7 +792,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                         label="Duration"
                         fixedContent={
                             <>
-                                {renderGoalCell('run_duration', 'Target Duration', 'duration')}
+                                {renderGoalCell('run_duration', 'Target Duration', runningVolume.totalDuration, 'duration')}
                                 <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
                                     <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
                                         {formatDuration(runningVolume.totalDuration)}
@@ -750,7 +825,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                         label="Avg Pace"
                         fixedContent={
                             <>
-                                {renderGoalCell('run_pace', 'Target Pace', 'pace', '/mi')}
+                                {renderGoalCell('run_pace', 'Target Pace', runningVolume.averagePace, 'pace', '/mi')}
                                 <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
                                     <span className="text-xs tabular-nums font-medium text-gray-400">—</span>
                                 </td>
@@ -783,7 +858,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                             label={milestone.label}
                             fixedContent={
                                 <>
-                                    {renderGoalCell(`run_time_${milestone.key}`, `${milestone.label} Time`, 'duration')}
+                                    {renderGoalCell(`run_time_${milestone.key}`, `${milestone.label} Time`, undefined, 'duration')}
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
                                         <span className="text-xs tabular-nums font-medium text-gray-400">—</span>
                                     </td>
