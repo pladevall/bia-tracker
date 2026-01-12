@@ -507,12 +507,12 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
             }
             headerFixedContent={
                 <>
-                    <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800 bg-blue-50 dark:bg-blue-900/40">
+                    <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800 bg-blue-50/70 dark:bg-blue-900/20">
                         <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Goal</span>
                     </th>
                     <th className="px-2 py-2 text-center min-w-[80px] border-l border-gray-100 dark:border-gray-800 bg-blue-50 dark:bg-blue-900/40">
                         <div className="flex flex-col items-center gap-1">
-                            <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Volume</span>
+                            <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Workload</span>
                             <div className="flex gap-0.5">
                                 {(['sets', 'volume'] as VolumeDisplayMode[]).map(mode => (
                                     <button
@@ -530,23 +530,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                         </div>
                     </th>
                     <th className="px-2 py-2 text-center min-w-[70px] border-l border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
-                        <div className="flex flex-col items-center gap-1">
-                            <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Trend</span>
-                            <div className="flex gap-0.5">
-                                {(['WTD', 'MTD', 'QTD', 'YTD'] as TrendPeriod[]).map(period => (
-                                    <button
-                                        key={period}
-                                        onClick={() => setTrendPeriod(period)}
-                                        className={`px-1.5 py-0.5 text-[9px] rounded transition-colors ${trendPeriod === period
-                                            ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 font-medium'
-                                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                                            }`}
-                                    >
-                                        {period}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Trend</span>
                     </th>
                 </>
             }
@@ -589,25 +573,48 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                         <td className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50" />
                         <td className="px-2 py-1 bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50 text-center">
                             <div className="flex justify-center gap-0.5">
-                                {(['WTD', 'MTD', 'QTD', 'YTD', 'PY'] as VolumePeriod[]).map(period => (
-                                    <button
-                                        key={period}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setVolumePeriod(period);
-                                        }}
-                                        className={`px-1.5 py-0.5 text-[9px] rounded transition-colors ${volumePeriod === period
-                                            ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 font-medium'
-                                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                                            }`}
-                                    >
-                                        {period === 'PY' ? (
-                                            <Tooltip content={`Previous Year (Jan 1 – Dec 31, ${new Date().getFullYear() - 1})`}>
-                                                PY
+                                {(['WTD', 'MTD', 'QTD', 'YTD', 'PY'] as VolumePeriod[]).map(period => {
+                                    // Generate tooltip content - WTD uses dynamic date
+                                    let tooltipContent = '';
+                                    if (period === 'WTD') {
+                                        const now = new Date();
+                                        const day = now.getDay();
+                                        const monday = new Date(now);
+                                        monday.setDate(now.getDate() - day + (day === 0 ? -6 : 1));
+                                        const dayName = monday.toLocaleDateString('en-US', { weekday: 'short' });
+                                        const monthDay = monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                        tooltipContent = `Week to Date (${dayName}. ${monthDay} – Today)`;
+                                    } else {
+                                        tooltipContent = {
+                                            'MTD': 'Month to Date (1st – Today)',
+                                            'QTD': 'Quarter to Date (Q start – Today)',
+                                            'YTD': 'Year to Date (Jan 1 – Today)',
+                                            'PY': 'Previous Year (Full year)'
+                                        }[period] || period;
+                                    }
+
+                                    return (
+                                        <button
+                                            key={period}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setVolumePeriod(period);
+                                                // Also sync trendPeriod for periods that are valid for both
+                                                if (period !== 'PY') {
+                                                    setTrendPeriod(period);
+                                                }
+                                            }}
+                                            className={`px-1.5 py-0.5 text-[9px] rounded transition-colors ${volumePeriod === period
+                                                ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 font-medium'
+                                                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                                }`}
+                                        >
+                                            <Tooltip content={tooltipContent}>
+                                                {period}
                                             </Tooltip>
-                                        ) : period}
-                                    </button>
-                                ))}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </td>
                         <td className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50" />
