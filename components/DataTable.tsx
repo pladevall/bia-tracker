@@ -787,12 +787,16 @@ function CategorySection({
 
           // Insert Fat-to-Lean Change Ratio row after bodyFatMass
           if (metric.key === 'bodyFatMass' && category === 'core' && entries.length > 0) {
+            // Calculate average Fat-to-Lean ratio for trend column
+            const latestFatShare = entries[0] && entries[1] ? calculateFatShare(entries[0], entries[1]) : null;
+            const trendFatShare = latestEntry && comparisonEntry ? calculateFatShare(latestEntry, comparisonEntry) : null;
+
             const fatLeanRow = (
               <tr key="fat-lean-ratio" className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                 <td className="sticky left-0 z-10 bg-white dark:bg-gray-900 px-4 py-1.5 text-gray-600 dark:text-gray-300 min-w-[180px]">
                   <span className="text-xs inline-flex items-center gap-1">
                     Fat-to-Lean Δ Ratio
-                    <Tooltip content="Ideal: 50-100% when losing weight (losing mostly fat), 0-50% when gaining (gaining mostly lean)">
+                    <Tooltip content="Ideal: 50-100% when losing (losing mostly fat), 0-50% when gaining (gaining mostly lean)">
                       <svg className="w-3 h-3 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -806,7 +810,24 @@ function CategorySection({
                   <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                 </td>
                 <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-800/30">
-                  <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                  {trendFatShare?.value !== null && trendFatShare?.value !== undefined ? (
+                    <Tooltip content={
+                      <div className="text-left">
+                        <div className="font-medium mb-1">Trend Period Breakdown</div>
+                        <div>Fat: {trendFatShare.fatChange >= 0 ? '+' : ''}{trendFatShare.fatChange.toFixed(1)} lb</div>
+                        <div>Lean: {trendFatShare.leanChange >= 0 ? '+' : ''}{trendFatShare.leanChange.toFixed(1)} lb</div>
+                        <div className="border-t border-gray-600 mt-1 pt-1">
+                          Total: {trendFatShare.weightChange >= 0 ? '+' : ''}{trendFatShare.weightChange.toFixed(1)} lb
+                        </div>
+                      </div>
+                    }>
+                      <span className={`text-xs tabular-nums font-medium cursor-help ${trendFatShare.isGood ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
+                        {trendFatShare.value.toFixed(0)}%
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                  )}
                 </td>
                 {dataColumns.map((col) => {
                   if (col.type === 'dexa') {
@@ -840,43 +861,24 @@ function CategorySection({
                       );
                     }
 
-                    // Determine range status for the dot
-                    // Good ranges: losing weight = 50-100%, gaining weight = 0-50%
-                    let dotColor = '';
-                    let rangeLabel = '';
-                    if (fatShareData.value !== null) {
-                      if (fatShareData.weightChange < 0) {
-                        // Losing weight
-                        if (fatShareData.value >= 50 && fatShareData.value <= 100) {
-                          dotColor = 'bg-emerald-500';
-                          rangeLabel = 'Ideal range (50-100% when losing)';
-                        } else if (fatShareData.value >= 0 && fatShareData.value < 50) {
-                          dotColor = 'bg-amber-500';
-                          rangeLabel = 'Below ideal (losing too much lean)';
-                        } else {
-                          dotColor = 'bg-red-500';
-                          rangeLabel = 'Outside normal range';
-                        }
-                      } else {
-                        // Gaining weight
-                        if (fatShareData.value >= 0 && fatShareData.value <= 50) {
-                          dotColor = 'bg-emerald-500';
-                          rangeLabel = 'Ideal range (0-50% when gaining)';
-                        } else if (fatShareData.value > 50 && fatShareData.value <= 100) {
-                          dotColor = 'bg-amber-500';
-                          rangeLabel = 'Above ideal (gaining too much fat)';
-                        } else {
-                          dotColor = 'bg-red-500';
-                          rangeLabel = 'Outside normal range';
-                        }
-                      }
-                    }
-
-                    const colorClass = fatShareData.isGood === true
+                    // Simplified: green if good (isGood), red if bad
+                    const isGood = fatShareData.isGood === true;
+                    const dotColor = isGood ? 'bg-emerald-500' : 'bg-red-500';
+                    const colorClass = isGood
                       ? 'text-emerald-600 dark:text-emerald-400'
-                      : fatShareData.isGood === false
-                        ? 'text-red-500 dark:text-red-400'
-                        : 'text-gray-600 dark:text-gray-300';
+                      : 'text-red-500 dark:text-red-400';
+
+                    // Range label based on context
+                    let rangeLabel = '';
+                    if (fatShareData.weightChange < 0) {
+                      rangeLabel = isGood
+                        ? 'Good: >50% of loss is fat'
+                        : 'Warning: <50% of loss is fat (losing lean)';
+                    } else {
+                      rangeLabel = isGood
+                        ? 'Good: <50% of gain is fat'
+                        : 'Warning: >50% of gain is fat';
+                    }
 
                     const displayValue = fatShareData.value !== null
                       ? `${fatShareData.value.toFixed(0)}%`
@@ -890,6 +892,9 @@ function CategorySection({
                         <div className="border-t border-gray-600 mt-1 pt-1">
                           Total: {fatShareData.weightChange >= 0 ? '+' : ''}{fatShareData.weightChange.toFixed(1)} lb
                         </div>
+                        <div className="border-t border-gray-600 mt-1 pt-1 text-[10px] opacity-80">
+                          Ideal: {fatShareData.weightChange < 0 ? '50-100%' : '0-50%'}
+                        </div>
                       </div>
                     );
 
@@ -899,7 +904,7 @@ function CategorySection({
                         className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50"
                       >
                         <span className={`text-xs inline-flex items-center justify-center gap-1.5 ${colorClass}`}>
-                          {dotColor ? (
+                          {fatShareData.value !== null ? (
                             <Tooltip content={rangeLabel}>
                               <span className={`w-1.5 h-1.5 rounded-full ${dotColor} cursor-help flex-shrink-0`} />
                             </Tooltip>
