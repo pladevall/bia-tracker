@@ -155,7 +155,7 @@ export class HevyClient {
     async getAllWorkouts(since?: Date): Promise<HevyWorkout[]> {
         const allWorkouts: HevyWorkout[] = [];
         let page = 1;
-        const pageSize = 20;
+        const pageSize = 10;  // Hevy API limit is 10
 
         const sinceTime = since ? since.getTime() : 0;
 
