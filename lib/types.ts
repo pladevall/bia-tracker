@@ -370,7 +370,7 @@ export type BodyPart = typeof BODY_PARTS[number];
 // ========================================
 
 export type WorkoutType = 'run' | 'lifting' | 'all';
-export type VolumePeriod = '7' | '30' | '90' | 'YTD' | 'PY';
+export type VolumePeriod = 'WTD' | 'MTD' | 'QTD' | 'YTD' | 'PY';
 
 // Unified workout entry for display in WorkoutTable
 export interface WorkoutEntry {

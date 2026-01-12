@@ -24,13 +24,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "BIA Tracker",
-  description: "Track your body composition analysis over time",
+  title: "Baseline",
+  description: "Unified fitness metrics",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "BIA Tracker",
+    title: "Baseline",
   },
   icons: {
     icon: "/icon-192.png",

@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
-          message: 'Image queued! Open BIA Tracker to process.',
+          message: 'Image queued! Open Baseline to process.',
           method: 'database'
         });
       }
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Image uploaded! Open BIA Tracker to process.',
+      message: 'Image uploaded! Open Baseline to process.',
       filename
     });
   } catch (error) {
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     status: 'ok',
-    endpoint: 'BIA Tracker Upload API',
+    endpoint: 'Baseline Upload API',
     usage: 'POST with multipart/form-data, field name: image'
   });
 }

@@ -3,11 +3,20 @@
 import { useState, useMemo } from 'react';
 import { RunningActivity, LiftingWorkout, WorkoutType, VolumePeriod, BODY_PARTS, RUNNING_MILESTONES } from '@/lib/types';
 import { TimeSeriesTable, TimeSeriesRow, SectionHeaderRow } from './TimeSeriesTable';
+import { Goal } from '@/lib/supabase';
+import GoalEditor from './GoalEditor';
+import Tooltip from './Tooltip';
 
 interface WorkoutTableProps {
     runningActivities: RunningActivity[];
     liftingWorkouts: LiftingWorkout[];
+    goals: Goal[];
+    onSaveGoal: (metricKey: string, value: number) => void;
+    onDeleteGoal: (metricKey: string) => void;
 }
+
+type VolumeDisplayMode = 'sets' | 'volume';
+type TrendPeriod = '7' | '30' | '90' | 'YTD';
 
 // Format seconds as mm:ss or h:mm:ss
 function formatDuration(seconds: number): string {
@@ -68,9 +77,39 @@ function getTimeAtMile(splits: { mile: number; cumulativeSeconds: number }[] | n
     return null;
 }
 
-export default function WorkoutTable({ runningActivities, liftingWorkouts }: WorkoutTableProps) {
+// Format volume in thousands (e.g., 12500 -> "12.5k")
+function formatVolume(volumeLbs: number): string {
+    if (volumeLbs >= 1000) {
+        return `${(volumeLbs / 1000).toFixed(1)}k`;
+    }
+    return volumeLbs.toFixed(0);
+}
+
+// Format trend value with sign and color
+function formatTrendValue(diff: number, isVolume: boolean): { text: string; color: string } {
+    if (Math.abs(diff) < 0.5) return { text: '—', color: 'text-gray-400' };
+
+    const sign = diff > 0 ? '+' : '';
+    const text = isVolume
+        ? `${sign}${formatVolume(diff)}`
+        : `${sign}${diff.toFixed(0)}`;
+
+    // For both sets and volume, higher is better (more work done)
+    const color = diff > 0
+        ? 'text-emerald-600 dark:text-emerald-400'
+        : 'text-red-500 dark:text-red-400';
+
+    return { text, color };
+}
+
+export default function WorkoutTable({ runningActivities, liftingWorkouts, goals, onSaveGoal, onDeleteGoal }: WorkoutTableProps) {
     const [workoutType, setWorkoutType] = useState<WorkoutType>('all');
-    const [volumePeriod, setVolumePeriod] = useState<VolumePeriod>('7');
+    const [volumePeriod, setVolumePeriod] = useState<VolumePeriod>('WTD');
+    const [volumeDisplayMode, setVolumeDisplayMode] = useState<VolumeDisplayMode>('sets');
+    const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('30');
+    const [editingGoal, setEditingGoal] = useState<{ metricKey: string; label: string; type?: 'number' | 'duration' | 'pace' } | null>(null);
+
+    const goalsMap = useMemo(() => new Map(goals.map(g => [g.metricKey, g.targetValue])), [goals]);
 
     // Get unique dates from all workouts, sorted newest first
     const allDates = useMemo(() => {
@@ -102,19 +141,33 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
     // Calculate volume period range
     const volumeStartDate = useMemo(() => {
         const now = new Date();
+        now.setHours(0, 0, 0, 0); // Normalize to start of day
+
         switch (volumePeriod) {
-            case '7':
-                return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            case '30':
-                return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            case '90':
-                return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+            case 'WTD': {
+                // Return start of current week (Monday)
+                const day = now.getDay();
+                const diff = now.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+                return new Date(now.setDate(diff));
+            }
+            case 'MTD': {
+                // Return start of current month
+                return new Date(now.getFullYear(), now.getMonth(), 1);
+            }
+            case 'QTD': {
+                // Return start of current quarter
+                const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+                return new Date(now.getFullYear(), quarterMonth, 1);
+            }
             case 'YTD':
                 return new Date(now.getFullYear(), 0, 1);
             case 'PY':
                 return new Date(now.getFullYear() - 1, 0, 1);
             default:
-                return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                // Default to WTD (Monday) logic
+                const day = now.getDay();
+                const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+                return new Date(now.setDate(diff));
         }
     }, [volumePeriod]);
 
@@ -135,21 +188,25 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
         let totalSets = 0;
         let totalDuration = 0;
         let totalReps = 0;
-        const bodyPartTotals: Record<string, number> = {};
+        let totalVolumeLbs = 0;
+        const bodyPartSets: Record<string, number> = {};
+        const bodyPartVolume: Record<string, number> = {};
 
         workoutsInRange.forEach(w => {
             totalSets += w.totalSets;
             totalDuration += w.durationSeconds;
             totalReps += w.totalReps;
+            totalVolumeLbs += w.totalVolumeLbs || 0;
 
             if (w.bodyParts) {
                 Object.entries(w.bodyParts).forEach(([part, stats]) => {
-                    bodyPartTotals[part] = (bodyPartTotals[part] || 0) + stats.sets;
+                    bodyPartSets[part] = (bodyPartSets[part] || 0) + stats.sets;
+                    bodyPartVolume[part] = (bodyPartVolume[part] || 0) + (stats.volumeLbs || 0);
                 });
             }
         });
 
-        return { totalSets, totalDuration, totalReps, bodyPartTotals };
+        return { totalSets, totalDuration, totalReps, totalVolumeLbs, bodyPartSets, bodyPartVolume };
     }, [liftingWorkouts, volumeStartDate, volumeEndDate]);
 
     const runningVolume = useMemo(() => {
@@ -168,6 +225,97 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
 
         return { totalMiles, totalDuration };
     }, [runningActivities, volumeStartDate, volumeEndDate]);
+
+    // Calculate trend data (compare current period vs previous period)
+    const trendData = useMemo(() => {
+        const now = new Date();
+        let currentStart: Date;
+        let previousStart: Date;
+        let previousEnd: Date;
+
+        if (trendPeriod === 'YTD') {
+            // YTD: compare to same period last year
+            currentStart = new Date(now.getFullYear(), 0, 1);
+            previousStart = new Date(now.getFullYear() - 1, 0, 1);
+            previousEnd = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        } else {
+            const days = parseInt(trendPeriod);
+            currentStart = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+            previousEnd = new Date(currentStart.getTime() - 1); // Day before current period
+            previousStart = new Date(previousEnd.getTime() - days * 24 * 60 * 60 * 1000);
+        }
+
+        // Current period totals
+        const currentWorkouts = liftingWorkouts.filter(w => {
+            const date = new Date(w.workoutDate);
+            return date >= currentStart && date <= now;
+        });
+
+        // Previous period totals
+        const previousWorkouts = liftingWorkouts.filter(w => {
+            const date = new Date(w.workoutDate);
+            return date >= previousStart && date <= previousEnd;
+        });
+
+        const calculateTotals = (workouts: LiftingWorkout[]) => {
+            let totalSets = 0;
+            let totalVolumeLbs = 0;
+            const bodyPartSets: Record<string, number> = {};
+            const bodyPartVolume: Record<string, number> = {};
+
+            workouts.forEach(w => {
+                totalSets += w.totalSets;
+                totalVolumeLbs += w.totalVolumeLbs || 0;
+
+                if (w.bodyParts) {
+                    Object.entries(w.bodyParts).forEach(([part, stats]) => {
+                        bodyPartSets[part] = (bodyPartSets[part] || 0) + stats.sets;
+                        bodyPartVolume[part] = (bodyPartVolume[part] || 0) + (stats.volumeLbs || 0);
+                    });
+                }
+            });
+
+            return { totalSets, totalVolumeLbs, bodyPartSets, bodyPartVolume };
+        };
+
+        const current = calculateTotals(currentWorkouts);
+        const previous = calculateTotals(previousWorkouts);
+
+        // Calculate diffs
+        const setsDiff = current.totalSets - previous.totalSets;
+        const volumeDiff = current.totalVolumeLbs - previous.totalVolumeLbs;
+        const bodyPartSetsDiff: Record<string, number> = {};
+        const bodyPartVolumeDiff: Record<string, number> = {};
+
+        // Get all body parts from both periods
+        const allParts = new Set([...Object.keys(current.bodyPartSets), ...Object.keys(previous.bodyPartSets)]);
+        allParts.forEach(part => {
+            bodyPartSetsDiff[part] = (current.bodyPartSets[part] || 0) - (previous.bodyPartSets[part] || 0);
+            bodyPartVolumeDiff[part] = (current.bodyPartVolume[part] || 0) - (previous.bodyPartVolume[part] || 0);
+        });
+
+        // Running trend
+        const currentRuns = runningActivities.filter(a => {
+            const date = new Date(a.activityDate);
+            return date >= currentStart && date <= now;
+        });
+        const previousRuns = runningActivities.filter(a => {
+            const date = new Date(a.activityDate);
+            return date >= previousStart && date <= previousEnd;
+        });
+
+        const currentMiles = currentRuns.reduce((sum, a) => sum + a.distanceMiles, 0);
+        const previousMiles = previousRuns.reduce((sum, a) => sum + a.distanceMiles, 0);
+        const milesDiff = currentMiles - previousMiles;
+
+        return {
+            setsDiff,
+            volumeDiff,
+            bodyPartSetsDiff,
+            bodyPartVolumeDiff,
+            milesDiff,
+        };
+    }, [liftingWorkouts, runningActivities, trendPeriod]);
 
     // Get body parts that have data
     const activeBodyParts = useMemo(() => {
@@ -200,7 +348,47 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
     }
 
     const colCount = displayDates.length;
-    const stickyWidth = "min-w-[140px]";
+    const stickyWidth = "min-w-[170px]";
+
+    const renderGoalCell = (metricKey: string, label: string, type: 'number' | 'duration' | 'pace' = 'number', unit?: string) => {
+        const goalValue = goalsMap.get(metricKey);
+
+        let displayValue = '—';
+        let colorClass = 'text-gray-300 dark:text-gray-700';
+
+        if (goalValue) {
+            colorClass = 'text-blue-600 dark:text-blue-400 font-medium';
+            if (type === 'duration') {
+                displayValue = formatDuration(goalValue);
+            } else if (type === 'pace') {
+                displayValue = formatPace(goalValue);
+            } else {
+                displayValue = goalValue.toLocaleString();
+            }
+        } else {
+            displayValue = '+';
+            colorClass = 'text-gray-300 dark:text-gray-600 group-hover:text-blue-500 transition-colors';
+        }
+
+        return (
+            <td
+                className="group px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20 cursor-pointer hover:bg-blue-100/50 dark:hover:bg-blue-900/40"
+                onClick={() => setEditingGoal({ metricKey, label, type })}
+            >
+                {goalValue ? (
+                    <Tooltip content={unit ? `Goal: ${displayValue} ${unit}` : `Goal: ${displayValue}`}>
+                        <span className={`text-xs tabular-nums ${colorClass}`}>
+                            {displayValue}
+                        </span>
+                    </Tooltip>
+                ) : (
+                    <span className={`text-xs ${colorClass}`}>
+                        {displayValue}
+                    </span>
+                )}
+            </td>
+        );
+    };
 
     return (
         <TimeSeriesTable
@@ -208,25 +396,66 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                 <span>Metric</span>
             }
             headerFixedContent={
-                <th className="px-2 py-2 text-center min-w-[80px] border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20">
-                    <div className="flex flex-col items-center gap-1">
-                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Volume</span>
-                        <div className="flex gap-0.5">
-                            {(['7', '30', '90', 'YTD', 'PY'] as VolumePeriod[]).map(period => (
-                                <button
-                                    key={period}
-                                    onClick={() => setVolumePeriod(period)}
-                                    className={`px-1.5 py-0.5 text-[9px] rounded transition-colors ${volumePeriod === period
-                                        ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 font-medium'
-                                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                                        }`}
-                                >
-                                    {period === 'YTD' || period === 'PY' ? period : `${period}d`}
-                                </button>
-                            ))}
+                <>
+                    <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20">
+                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Goal</span>
+                    </th>
+                    <th className="px-2 py-2 text-center min-w-[80px] border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20">
+                        <div className="flex flex-col items-center gap-1">
+                            <div className="flex gap-0.5">
+                                {(['sets', 'volume'] as VolumeDisplayMode[]).map(mode => (
+                                    <button
+                                        key={mode}
+                                        onClick={() => setVolumeDisplayMode(mode)}
+                                        className={`px-1.5 py-0.5 text-[9px] rounded transition-colors ${volumeDisplayMode === mode
+                                            ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 font-medium'
+                                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                            }`}
+                                    >
+                                        {mode === 'sets' ? 'Sets' : 'Vol'}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="flex gap-0.5">
+                                {(['WTD', 'MTD', 'QTD', 'YTD', 'PY'] as VolumePeriod[]).map(period => (
+                                    <button
+                                        key={period}
+                                        onClick={() => setVolumePeriod(period)}
+                                        className={`px-1.5 py-0.5 text-[9px] rounded transition-colors ${volumePeriod === period
+                                            ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 font-medium'
+                                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                            }`}
+                                    >
+                                        {period === 'PY' ? (
+                                            <Tooltip content={`Previous Year (Jan 1 – Dec 31, ${new Date().getFullYear() - 1})`}>
+                                                PY
+                                            </Tooltip>
+                                        ) : period}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                </th>
+                    </th>
+                    <th className="px-2 py-2 text-center min-w-[70px] border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-800/30">
+                        <div className="flex flex-col items-center gap-1">
+                            <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Trend</span>
+                            <div className="flex gap-0.5">
+                                {(['7', '30', '90', 'YTD'] as TrendPeriod[]).map(period => (
+                                    <button
+                                        key={period}
+                                        onClick={() => setTrendPeriod(period)}
+                                        className={`px-1.5 py-0.5 text-[9px] rounded transition-colors ${trendPeriod === period
+                                            ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 font-medium'
+                                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                            }`}
+                                    >
+                                        {period === 'YTD' ? period : `${period}d`}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </th>
+                </>
             }
             columns={displayDates}
             renderColumnHeader={(date) => (
@@ -261,7 +490,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                 }
                 color="gray"
                 columnCount={colCount}
-                fixedCellsCount={1}
+                fixedCellsCount={3}
             />
 
             {/* Lifting Section */}
@@ -271,17 +500,29 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                         label="Lifting"
                         color="purple"
                         columnCount={colCount}
-                        fixedCellsCount={1}
+                        fixedCellsCount={3}
                     />
                     {/* Sets */}
                     <TimeSeriesRow
                         label="Sets"
                         fixedContent={
-                            <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
-                                    {liftingVolume.totalSets}
-                                </span>
-                            </td>
+                            <>
+                                {renderGoalCell('lift_sets', 'Target Sets', 'number', 'sets')}
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
+                                    <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                        {volumeDisplayMode === 'sets'
+                                            ? liftingVolume.totalSets
+                                            : formatVolume(liftingVolume.totalVolumeLbs)}
+                                    </span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                    {(() => {
+                                        const diff = volumeDisplayMode === 'sets' ? trendData.setsDiff : trendData.volumeDiff;
+                                        const { text, color } = formatTrendValue(diff, volumeDisplayMode === 'volume');
+                                        return <span className={`text-xs tabular-nums font-medium ${color}`}>{text}</span>;
+                                    })()}
+                                </td>
+                            </>
                         }
                         stickyColumnWidth={stickyWidth}
                     >
@@ -304,11 +545,17 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                     <TimeSeriesRow
                         label="Duration"
                         fixedContent={
-                            <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
-                                    {formatDuration(liftingVolume.totalDuration)}
-                                </span>
-                            </td>
+                            <>
+                                {renderGoalCell('lift_duration', 'Target Duration', 'duration')}
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
+                                    <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                        {formatDuration(liftingVolume.totalDuration)}
+                                    </span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                            </>
                         }
                         stickyColumnWidth={stickyWidth}
                     >
@@ -331,11 +578,17 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                     <TimeSeriesRow
                         label="Reps"
                         fixedContent={
-                            <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
-                                    {liftingVolume.totalReps.toLocaleString()}
-                                </span>
-                            </td>
+                            <>
+                                {renderGoalCell('lift_reps', 'Target Reps', 'number', 'reps')}
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
+                                    <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                        {liftingVolume.totalReps.toLocaleString()}
+                                    </span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                            </>
                         }
                         stickyColumnWidth={stickyWidth}
                     >
@@ -355,36 +608,59 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                         })}
                     </TimeSeriesRow>
                     {/* Body parts */}
-                    {activeBodyParts.map(part => (
-                        <TimeSeriesRow
-                            key={part}
-                            label={<span className="capitalize">{part}</span>}
-                            fixedContent={
-                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                    <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
-                                        {liftingVolume.bodyPartTotals[part] || '—'}
-                                    </span>
-                                </td>
-                            }
-                            stickyColumnWidth={stickyWidth}
-                        >
-                            {displayDates.map(date => {
-                                const workout = liftingByDate.get(date);
-                                const sets = workout?.bodyParts?.[part]?.sets;
-                                return (
-                                    <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
-                                        {sets ? (
+                    {activeBodyParts.map(part => {
+                        const volumeValue = volumeDisplayMode === 'sets'
+                            ? liftingVolume.bodyPartSets[part]
+                            : liftingVolume.bodyPartVolume[part];
+                        const trendDiff = volumeDisplayMode === 'sets'
+                            ? trendData.bodyPartSetsDiff[part] || 0
+                            : trendData.bodyPartVolumeDiff[part] || 0;
+                        const { text: trendText, color: trendColor } = formatTrendValue(trendDiff, volumeDisplayMode === 'volume');
+
+                        return (
+                            <TimeSeriesRow
+                                key={part}
+                                label={<span className="capitalize">{part}</span>}
+                                fixedContent={
+                                    <>
+                                        {renderGoalCell(`lift_sets_${part}`, `${part.charAt(0).toUpperCase() + part.slice(1)} Sets`, 'number', 'sets')}
+                                        <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
                                             <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
-                                                {sets}
+                                                {volumeValue
+                                                    ? (volumeDisplayMode === 'volume' ? formatVolume(volumeValue) : volumeValue)
+                                                    : '—'}
                                             </span>
-                                        ) : (
-                                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
-                                        )}
-                                    </td>
-                                );
-                            })}
-                        </TimeSeriesRow>
-                    ))}
+                                        </td>
+                                        <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                            <span className={`text-xs tabular-nums font-medium ${trendColor}`}>
+                                                {trendText}
+                                            </span>
+                                        </td>
+                                    </>
+                                }
+                                stickyColumnWidth={stickyWidth}
+                            >
+                                {displayDates.map(date => {
+                                    const workout = liftingByDate.get(date);
+                                    const stats = workout?.bodyParts?.[part];
+                                    const displayValue = volumeDisplayMode === 'sets'
+                                        ? stats?.sets
+                                        : stats?.volumeLbs;
+                                    return (
+                                        <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
+                                            {displayValue ? (
+                                                <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                                    {volumeDisplayMode === 'volume' ? formatVolume(displayValue) : displayValue}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                            )}
+                                        </td>
+                                    );
+                                })}
+                            </TimeSeriesRow>
+                        );
+                    })}
                 </>
             )}
 
@@ -395,17 +671,29 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                         label="Running"
                         color="orange"
                         columnCount={colCount}
-                        fixedCellsCount={1}
+                        fixedCellsCount={3}
                     />
                     {/* Miles */}
                     <TimeSeriesRow
                         label="Miles"
                         fixedContent={
-                            <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
-                                    {runningVolume.totalMiles.toFixed(1)}
-                                </span>
-                            </td>
+                            <>
+                                {renderGoalCell('run_miles', 'Target Miles', 'number', 'mi')}
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
+                                    <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                        {runningVolume.totalMiles.toFixed(1)}
+                                    </span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                    {(() => {
+                                        const diff = trendData.milesDiff;
+                                        if (Math.abs(diff) < 0.1) return <span className="text-xs text-gray-400">—</span>;
+                                        const sign = diff > 0 ? '+' : '';
+                                        const color = diff > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400';
+                                        return <span className={`text-xs tabular-nums font-medium ${color}`}>{sign}{diff.toFixed(1)}</span>;
+                                    })()}
+                                </td>
+                            </>
                         }
                         stickyColumnWidth={stickyWidth}
                     >
@@ -428,11 +716,17 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                     <TimeSeriesRow
                         label="Duration"
                         fixedContent={
-                            <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
-                                    {formatDuration(runningVolume.totalDuration)}
-                                </span>
-                            </td>
+                            <>
+                                {renderGoalCell('run_duration', 'Target Duration', 'duration')}
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
+                                    <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                        {formatDuration(runningVolume.totalDuration)}
+                                    </span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                            </>
                         }
                         stickyColumnWidth={stickyWidth}
                     >
@@ -455,9 +749,15 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                     <TimeSeriesRow
                         label="Avg Pace"
                         fixedContent={
-                            <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                <span className="text-xs tabular-nums font-medium text-gray-400">—</span>
-                            </td>
+                            <>
+                                {renderGoalCell('run_pace', 'Target Pace', 'pace', '/mi')}
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
+                                    <span className="text-xs tabular-nums font-medium text-gray-400">—</span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                            </>
                         }
                         stickyColumnWidth={stickyWidth}
                     >
@@ -482,9 +782,15 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                             key={milestone.key}
                             label={milestone.label}
                             fixedContent={
-                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                    <span className="text-xs tabular-nums font-medium text-gray-400">—</span>
-                                </td>
+                                <>
+                                    {renderGoalCell(`run_time_${milestone.key}`, `${milestone.label} Time`, 'duration')}
+                                    <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
+                                        <span className="text-xs tabular-nums font-medium text-gray-400">—</span>
+                                    </td>
+                                    <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    </td>
+                                </>
                             }
                             stickyColumnWidth={stickyWidth}
                         >
@@ -513,6 +819,18 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts }: Wor
                         </TimeSeriesRow>
                     ))}
                 </>
+            )}
+
+            {editingGoal && (
+                <GoalEditor
+                    metricKey={editingGoal.metricKey}
+                    metricLabel={editingGoal.label}
+                    inputType={editingGoal.type}
+                    currentValue={goalsMap.get(editingGoal.metricKey) || null}
+                    onSave={onSaveGoal}
+                    onDelete={onDeleteGoal}
+                    onClose={() => setEditingGoal(null)}
+                />
             )}
         </TimeSeriesTable>
     );

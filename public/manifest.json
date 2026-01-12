@@ -1,7 +1,7 @@
 {
-  "name": "BIA Tracker",
-  "short_name": "BIA Tracker",
-  "description": "Track your body composition analysis over time",
+  "name": "Baseline",
+  "short_name": "Baseline",
+  "description": "Unified fitness metrics",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#030712",

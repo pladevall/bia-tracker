@@ -368,9 +368,9 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         <header className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">BIA Tracker</h1>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Baseline</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Track your body composition
+              Unified fitness metrics
             </p>
           </div>
           <ThemeToggle />
@@ -410,6 +410,9 @@ export default function Home() {
             <WorkoutTable
               runningActivities={runningActivities}
               liftingWorkouts={liftingWorkouts}
+              goals={goals}
+              onSaveGoal={handleSaveGoal}
+              onDeleteGoal={handleDeleteGoal}
             />
           </section>
         )}
