@@ -30,7 +30,7 @@ export interface HevyExercise {
 
 export interface HevySet {
     index: number;
-    set_type: 'normal' | 'warmup' | 'dropset' | 'failure';
+    type: 'normal' | 'warmup' | 'dropset' | 'failure';
     weight_kg: number | null;
     reps: number | null;
     distance_meters: number | null;
@@ -295,7 +295,7 @@ export async function convertHevyWorkout(
 
         for (const set of exercise.sets) {
             // Only count normal sets (not warmup)
-            if (set.set_type === 'normal' || set.set_type === 'dropset' || set.set_type === 'failure') {
+            if (set.type === 'normal' || set.type === 'dropset' || set.type === 'failure') {
                 exerciseSets++;
 
                 const reps = set.reps || 0;

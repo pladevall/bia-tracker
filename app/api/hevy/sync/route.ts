@@ -42,19 +42,7 @@ export async function POST(request: NextRequest) {
             // Always fetch ALL workouts - the upsert will update existing records
             // This ensures we always have the latest data including sets/reps/bodyparts
             const hevyWorkouts = await client.getAllWorkouts();
-
-            // WRITE DEBUG LOG TO FILE
-            try {
-                const fs = require('fs');
-                const debugData = {
-                    timestamp: new Date().toISOString(),
-                    count: hevyWorkouts.length,
-                    firstWorkoutRaw: hevyWorkouts.length > 0 ? hevyWorkouts[0] : null,
-                };
-                fs.writeFileSync('./public/hevy-debug.json', JSON.stringify(debugData, null, 2));
-            } catch (err) {
-                console.error('Failed to write debug log:', err);
-            }
+            console.log(`[Hevy Sync] Fetched ${hevyWorkouts.length} workouts from API`);
 
             // Pre-fetch exercise templates to populate cache and avoid rate limiting
             // during parallel conversion below
