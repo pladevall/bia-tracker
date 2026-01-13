@@ -241,6 +241,82 @@ export class HevyClient {
         const muscleGroup = template.primary_muscle_group.toLowerCase();
         return MUSCLE_GROUP_TO_BODY_PART[muscleGroup] || 'other';
     }
+
+    /**
+     * Find exercise template ID by name (case-insensitive partial match)
+     */
+    async getTemplateIdByName(exerciseName: string): Promise<string | null> {
+        // Ensure templates are loaded
+        if (this.exerciseTemplatesCache.size === 0) {
+            await this.getExerciseTemplates();
+        }
+
+        const lowerName = exerciseName.toLowerCase();
+
+        // Try exact match first
+        for (const [id, template] of this.exerciseTemplatesCache) {
+            if (template.title.toLowerCase() === lowerName) {
+                return id;
+            }
+        }
+
+        // Try partial match
+        for (const [id, template] of this.exerciseTemplatesCache) {
+            if (template.title.toLowerCase().includes(lowerName) || lowerName.includes(template.title.toLowerCase())) {
+                return id;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Create a new routine in Hevy
+     */
+    async createRoutine(routine: {
+        title: string;
+        notes?: string;
+        folder_id?: string;
+        exercises: Array<{
+            exercise_template_id: string;
+            superset_id?: number | null;
+            rest_seconds?: number;
+            notes?: string;
+            sets: Array<{
+                type?: 'normal' | 'warmup' | 'dropset' | 'failure';
+                weight_kg?: number | null;
+                reps?: number | null;
+                distance_meters?: number | null;
+                duration_seconds?: number | null;
+                rpe?: number | null;
+            }>;
+        }>;
+    }): Promise<{ id: string; title: string }> {
+        const response = await this.request<{ routine: { id: string; title: string } }>('/routines', {
+            method: 'POST',
+            body: JSON.stringify({ routine }),
+        });
+        return response.routine;
+    }
+
+    /**
+     * Get all routine folders
+     */
+    async getRoutineFolders(): Promise<Array<{ id: string; title: string }>> {
+        const data = await this.request<{ routine_folders: Array<{ id: string; title: string }> }>('/routine_folders');
+        return data.routine_folders;
+    }
+
+    /**
+     * Create a routine folder
+     */
+    async createRoutineFolder(title: string): Promise<{ id: string; title: string }> {
+        const response = await this.request<{ routine_folder: { id: string; title: string } }>('/routine_folders', {
+            method: 'POST',
+            body: JSON.stringify({ routine_folder: { title } }),
+        });
+        return response.routine_folder;
+    }
 }
 
 // Conversion constants

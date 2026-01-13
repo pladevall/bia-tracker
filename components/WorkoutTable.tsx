@@ -126,6 +126,34 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
     type HighlightSentiment = 'good' | 'bad' | 'neutral';
     const [highlightedRanges, setHighlightedRanges] = useState<{ metricKey: string; current: { start: Date; end: Date }; previous: { start: Date; end: Date }; sentiment: HighlightSentiment } | null>(null);
     const [editingGoal, setEditingGoal] = useState<{ metricKey: string; label: string; type?: 'number' | 'duration' | 'pace' } | null>(null);
+    const [isPushingToHevy, setIsPushingToHevy] = useState(false);
+
+    // Handle pushing generated workout to Hevy
+    const handlePushToHevy = async (workout: GeneratedLiftingWorkout) => {
+        if (!workout) return;
+
+        setIsPushingToHevy(true);
+        try {
+            const response = await fetch('/api/hevy/routines', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ workout }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to create routine');
+            }
+
+            alert(`Routine "${data.routine.title}" created in Hevy! (${data.exercisesMapped} exercises${data.exercisesSkipped > 0 ? `, ${data.exercisesSkipped} skipped` : ''})`);
+        } catch (e) {
+            console.error('Error pushing to Hevy:', e);
+            alert(e instanceof Error ? e.message : 'Error creating routine');
+        } finally {
+            setIsPushingToHevy(false);
+        }
+    };
 
     const goalsMap = useMemo(() => new Map(goals.map(g => [g.metricKey, g.targetValue])), [goals]);
 
@@ -1290,24 +1318,38 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
                                         {nextLiftingWorkout ? (
-                                            <Tooltip content={
-                                                <div className="text-left text-xs max-w-xs">
-                                                    <div className="font-medium mb-2 text-green-400">{nextLiftingWorkout.name}</div>
-                                                    <div className="space-y-1.5">
-                                                        {nextLiftingWorkout.exercises.slice(0, 6).map((ex, i) => (
-                                                            <div key={i} className="text-gray-300">
-                                                                <span className="font-medium">{ex.name}</span>
-                                                                <span className="text-gray-500"> • {ex.sets.length} sets @ {ex.sets[0]?.weightLbs}lb x {ex.sets[0]?.targetReps}</span>
-                                                            </div>
-                                                        ))}
-                                                        {nextLiftingWorkout.exercises.length > 6 && (
-                                                            <div className="text-gray-500 italic">+{nextLiftingWorkout.exercises.length - 6} more...</div>
-                                                        )}
+                                            <div className="flex flex-col items-center gap-1">
+                                                <Tooltip content={
+                                                    <div className="text-left text-xs max-w-xs">
+                                                        <div className="font-medium mb-2 text-green-400">{nextLiftingWorkout.name}</div>
+                                                        <div className="space-y-1.5">
+                                                            {nextLiftingWorkout.exercises.slice(0, 6).map((ex, i) => (
+                                                                <div key={i} className="text-gray-300">
+                                                                    <span className="font-medium">{ex.name}</span>
+                                                                    <span className="text-gray-500"> • {ex.sets.length} sets @ {ex.sets[0]?.weightLbs}lb x {ex.sets[0]?.targetReps}</span>
+                                                                </div>
+                                                            ))}
+                                                            {nextLiftingWorkout.exercises.length > 6 && (
+                                                                <div className="text-gray-500 italic">+{nextLiftingWorkout.exercises.length - 6} more...</div>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            }>
-                                                <span className="text-xs tabular-nums font-medium cursor-help text-green-600 dark:text-green-400">{nextLiftingWorkout.totalSets}</span>
-                                            </Tooltip>
+                                                }>
+                                                    <span className="text-xs tabular-nums font-medium cursor-help text-green-600 dark:text-green-400">{nextLiftingWorkout.totalSets} sets</span>
+                                                </Tooltip>
+
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handlePushToHevy(nextLiftingWorkout);
+                                                    }}
+                                                    disabled={isPushingToHevy}
+                                                    className="text-[10px] bg-green-100 hover:bg-green-200 dark:bg-green-900/40 dark:hover:bg-green-900/60 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50"
+                                                    title="Create routine in Hevy"
+                                                >
+                                                    {isPushingToHevy ? '...' : 'Push'}
+                                                </button>
+                                            </div>
                                         ) : (
                                             <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                         )}
