@@ -21,19 +21,28 @@
     - Marathon training focus (sub-3:30 goal = 7:59/mi)
   - Types: `GeneratedLiftingWorkout`, `GeneratedRunningWorkout`, `GeneratedExercise`, `GeneratedSet`
 
+### Iteration 2: Added "Next" column to WorkoutTable UI
+- Added "Next" header column in table header (after Trend column)
+- Updated all `fixedCellsCount` from 4 to 5 in SectionHeaderRow components
+- Added empty "Next" cells to all TimeSeriesRow fixedContent sections:
+  - Streaks row
+  - Workouts row
+  - Lifting section: Sets, Duration, Reps, Body parts, Exercises rows
+  - Running section: Miles, Duration, Pace, Avg HR, Max HR, Cadence, Elevation, Split times rows
+- All cells styled with green background (`bg-green-50/30 dark:bg-green-900/10`)
+- TypeScript compiles without errors
+
 ## Remaining Tasks
 
-1. Add "Next Workout" column header in WorkoutTable.tsx (between Trend and date columns)
-2. Add "Next Workout" cells in rows (showing generated workout info)
-3. Test the UI displays correctly
-4. Add "Push to Hevy" button integration
+1. Import and call workout generators in WorkoutTable.tsx
+2. Display generated workout info in the "Next" column cells
+3. Add "Push to Hevy" button integration
+4. Test the full UI displays correctly
 5. Update PROMPT.md with progress
 
 ## Technical Notes
 
 - The WorkoutTable uses `TimeSeriesTable` component
-- Fixed columns are: Goal, Workload, Avg, Trend
-- Date columns come after the fixed columns
+- Fixed columns are now: Goal, Workload, Avg, Trend, Next (5 columns)
 - Each row uses `TimeSeriesRow` with `fixedContent` for the fixed columns
-- `fixedCellsCount={4}` in SectionHeaderRow
-- Need to add 5th fixed column for "Next Workout"
+- `fixedCellsCount={5}` in all SectionHeaderRow components

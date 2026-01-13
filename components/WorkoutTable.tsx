@@ -879,6 +879,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                     <th className="px-2 py-2 text-center min-w-[70px] border-l border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
                         <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Trend</span>
                     </th>
+                    <th className="px-2 py-2 text-center min-w-[120px] border-l border-gray-100 dark:border-gray-800 bg-green-50 dark:bg-green-900/20">
+                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Next</span>
+                    </th>
                 </>
             }
             columns={displayDates}
@@ -914,7 +917,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                 }
                 color="gray"
                 columnCount={colCount}
-                fixedCellsCount={4}
+                fixedCellsCount={5}
                 fixedContent={
                     <>
                         <td className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50" />
@@ -964,6 +967,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                 })}
                             </div>
                         </td>
+                        <td className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50" />
                         <td className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50" />
                         <td className="bg-gray-50 dark:bg-gray-900/50 border-l border-gray-100 dark:border-gray-800/50" />
                     </>
@@ -1066,6 +1070,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                 );
                             })()}
                         </td>
+                        <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
+                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                        </td>
                     </>
                 }
                 columns={displayDates} // Use same columns as main table
@@ -1167,6 +1174,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                 );
                             })()}
                         </td>
+                        <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
+                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                        </td>
                     </>
                 }
                 stickyColumnWidth={stickyWidth}
@@ -1207,7 +1217,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                             label="Lifting"
                             color="purple"
                             columnCount={colCount}
-                            fixedCellsCount={4}
+                            fixedCellsCount={5}
                         />
                         {/* Sets */}
                         <TimeSeriesRow
@@ -1271,6 +1281,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                                 </div>
                                             );
                                         })()}
+                                    </td>
+                                    <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                     </td>
                                 </>
                             }
@@ -1362,6 +1375,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                             );
                                         })()}
                                     </td>
+                                    <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    </td>
                                 </>
                             }
                             stickyColumnWidth={stickyWidth}
@@ -1431,6 +1447,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                                 </div>
                                             );
                                         })()}
+                                    </td>
+                                    <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                     </td>
                                 </>
                             }
@@ -1539,6 +1558,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                                         </Tooltip>
                                                     </div>
                                                 </td>
+                                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
+                                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                                </td>
                                             </>
                                         }
                                         stickyColumnWidth={stickyWidth}
@@ -1619,6 +1641,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                                             </span>
                                                         </td>
                                                         <td className="px-2 py-1 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/20 dark:bg-gray-800/10">
+                                                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                                        </td>
+                                                        <td className="px-2 py-1 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
                                                             <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                                         </td>
                                                     </>
@@ -1717,7 +1742,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                             label="Running"
                             color="orange"
                             columnCount={colCount}
-                            fixedCellsCount={4}
+                            fixedCellsCount={5}
                         />
                         {/* Miles */}
                         <TimeSeriesRow
@@ -1770,6 +1795,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                                 </div>
                                             );
                                         })()}
+                                    </td>
+                                    <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                     </td>
                                 </>
                             }
@@ -1829,6 +1857,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
                                         <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                     </td>
+                                    <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    </td>
                                 </>
                             }
                             stickyColumnWidth={stickyWidth}
@@ -1863,6 +1894,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                         <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    </td>
+                                    <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
                                         <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                     </td>
                                 </>
@@ -1920,6 +1954,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                             );
                                         })()}
                                     </td>
+                                    <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    </td>
                                 </>
                             }
                             stickyColumnWidth={stickyWidth}
@@ -1975,6 +2012,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                             );
                                         })()}
                                     </td>
+                                    <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    </td>
                                 </>
                             }
                             stickyColumnWidth={stickyWidth}
@@ -2029,6 +2069,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                                 </Tooltip>
                                             );
                                         })()}
+                                    </td>
+                                    <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                     </td>
                                 </>
                             }
@@ -2091,6 +2134,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                             );
                                         })()}
                                     </td>
+                                    <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    </td>
                                 </>
                             }
                             stickyColumnWidth={stickyWidth}
@@ -2146,6 +2192,12 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                             <span className="text-xs tabular-nums text-gray-300 dark:text-gray-700">—</span>
                                         </td>
                                         <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        </td>
+                                        <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        </td>
+                                        <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
                                             <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                         </td>
                                     </>
