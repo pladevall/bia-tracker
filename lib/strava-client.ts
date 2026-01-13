@@ -25,8 +25,13 @@ export interface StravaActivity {
     moving_time: number;    // seconds
     elapsed_time: number;   // seconds
     total_elevation_gain: number; // meters
+    elev_high?: number;     // meters - highest point
+    elev_low?: number;      // meters - lowest point
     average_speed: number;  // meters/second
     max_speed: number;
+    average_heartrate?: number;  // bpm
+    max_heartrate?: number;      // bpm
+    average_cadence?: number;    // rpm (for running: steps/min ÷ 2)
     splits_metric?: StravaSplit[];  // 1km splits
     splits_standard?: StravaSplit[]; // 1 mile splits
     laps?: StravaLap[];
@@ -245,7 +250,12 @@ export function convertStravaActivity(activity: StravaActivity): {
     distanceMiles: number;
     durationSeconds: number;
     elevationGainFeet: number | null;
+    elevHighFeet: number | null;
+    elevLowFeet: number | null;
     averagePaceSeconds: number | null;
+    averageHeartrate: number | null;
+    maxHeartrate: number | null;
+    averageCadence: number | null;
     splits: { mile: number; timeSeconds: number; cumulativeSeconds: number }[];
 } {
     const distanceMiles = activity.distance * METERS_TO_MILES;
@@ -260,8 +270,24 @@ export function convertStravaActivity(activity: StravaActivity): {
         elevationGainFeet: activity.total_elevation_gain
             ? Math.round(activity.total_elevation_gain * METERS_TO_FEET)
             : null,
+        elevHighFeet: activity.elev_high != null
+            ? Math.round(activity.elev_high * METERS_TO_FEET)
+            : null,
+        elevLowFeet: activity.elev_low != null
+            ? Math.round(activity.elev_low * METERS_TO_FEET)
+            : null,
         averagePaceSeconds: distanceMiles > 0
             ? Math.round(durationSeconds / distanceMiles)
+            : null,
+        averageHeartrate: activity.average_heartrate != null
+            ? Math.round(activity.average_heartrate)
+            : null,
+        maxHeartrate: activity.max_heartrate != null
+            ? Math.round(activity.max_heartrate)
+            : null,
+        // For running, Strava reports cadence as half-steps (one foot), so multiply by 2
+        averageCadence: activity.average_cadence != null
+            ? Math.round(activity.average_cadence * 2)
             : null,
         splits: calculateMileSplits(activity),
     };

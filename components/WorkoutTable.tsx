@@ -87,7 +87,7 @@ function formatVolume(volumeLbs: number): string {
 
 // Format trend value with sign and color
 function formatTrendValue(diff: number, isVolume: boolean): { text: string; color: string } {
-    if (Math.abs(diff) < 0.5) return { text: '—', color: 'text-gray-400' };
+    if (Math.abs(diff) < 0.5) return { text: '—', color: 'text-gray-300 dark:text-gray-700' };
 
     const sign = diff > 0 ? '+' : '';
     const text = isVolume
@@ -799,7 +799,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                     <>
                                         {renderGoalCell(`lift_sets_${part}`, `${part.charAt(0).toUpperCase() + part.slice(1)} Sets`, volumeValue, 'number', 'sets')}
                                         <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                            <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                            <span className={`text-xs tabular-nums ${volumeValue ? 'text-gray-900 dark:text-gray-100' : 'text-gray-300 dark:text-gray-700'}`}>
                                                 {volumeValue
                                                     ? (volumeDisplayMode === 'volume' ? formatVolume(volumeValue) : volumeValue)
                                                     : '—'}
@@ -903,7 +903,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                 <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
                                     {(() => {
                                         const diff = trendData.milesDiff;
-                                        if (Math.abs(diff) < 0.1) return <span className="text-xs text-gray-400">—</span>;
+                                        if (Math.abs(diff) < 0.1) return <span className="text-xs text-gray-300 dark:text-gray-700">—</span>;
                                         const sign = diff > 0 ? '+' : '';
                                         const color = diff > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400';
                                         return (
@@ -1007,7 +1007,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                             <>
                                 {renderGoalCell('run_pace', 'Target Pace', runningVolume.averagePace, 'pace', '/mi')}
                                 <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                    <span className="text-xs tabular-nums font-medium text-gray-400">—</span>
+                                    <span className="text-xs tabular-nums text-gray-300 dark:text-gray-700">—</span>
                                 </td>
                                 <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
                                     <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
@@ -1022,11 +1022,167 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                 <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
                                     {activity?.averagePaceSeconds ? (
                                         <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
-                                            {formatPace(activity.averagePaceSeconds)}/mi
+                                            {formatPace(activity.averagePaceSeconds)}<span className="text-gray-400">/mi</span>
                                         </span>
                                     ) : (
                                         <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                     )}
+                                </td>
+                            );
+                        })}
+                    </TimeSeriesRow>
+                    {/* Avg Heart Rate */}
+                    <TimeSeriesRow
+                        label="Avg HR"
+                        fixedContent={
+                            <>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20">
+                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
+                                    <span className="text-xs tabular-nums text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                            </>
+                        }
+                        stickyColumnWidth={stickyWidth}
+                    >
+                        {displayDates.map(date => {
+                            const activity = runningByDate.get(date);
+                            return (
+                                <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
+                                    {activity?.averageHeartrate ? (
+                                        <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                            {activity.averageHeartrate} <span className="text-gray-400">bpm</span>
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    )}
+                                </td>
+                            );
+                        })}
+                    </TimeSeriesRow>
+                    {/* Max Heart Rate */}
+                    <TimeSeriesRow
+                        label="Max HR"
+                        fixedContent={
+                            <>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20">
+                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
+                                    <span className="text-xs tabular-nums text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                            </>
+                        }
+                        stickyColumnWidth={stickyWidth}
+                    >
+                        {displayDates.map(date => {
+                            const activity = runningByDate.get(date);
+                            return (
+                                <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
+                                    {activity?.maxHeartrate ? (
+                                        <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                            {activity.maxHeartrate} <span className="text-gray-400">bpm</span>
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    )}
+                                </td>
+                            );
+                        })}
+                    </TimeSeriesRow>
+                    {/* Cadence */}
+                    <TimeSeriesRow
+                        label="Cadence"
+                        fixedContent={
+                            <>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20">
+                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
+                                    <span className="text-xs tabular-nums text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                            </>
+                        }
+                        stickyColumnWidth={stickyWidth}
+                    >
+                        {displayDates.map(date => {
+                            const activity = runningByDate.get(date);
+                            return (
+                                <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
+                                    {activity?.averageCadence ? (
+                                        <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                            {activity.averageCadence} <span className="text-gray-400">spm</span>
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    )}
+                                </td>
+                            );
+                        })}
+                    </TimeSeriesRow>
+                    {/* Elevation */}
+                    <TimeSeriesRow
+                        label="Elevation"
+                        fixedContent={
+                            <>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20">
+                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
+                                    <span className="text-xs tabular-nums text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                                <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
+                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                </td>
+                            </>
+                        }
+                        stickyColumnWidth={stickyWidth}
+                    >
+                        {displayDates.map(date => {
+                            const activity = runningByDate.get(date);
+                            const hasElevation = activity?.elevationGainFeet != null;
+                            const hasElevDetails = activity?.elevHighFeet != null || activity?.elevLowFeet != null;
+
+                            if (!hasElevation) {
+                                return (
+                                    <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
+                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                    </td>
+                                );
+                            }
+
+                            const elevContent = (
+                                <span className="text-xs tabular-nums text-gray-900 dark:text-gray-100">
+                                    +{activity.elevationGainFeet} <span className="text-gray-400">ft</span>
+                                </span>
+                            );
+
+                            return (
+                                <td key={date} className="px-3 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50">
+                                    {hasElevDetails ? (
+                                        <Tooltip content={
+                                            <div className="text-xs tabular-nums grid grid-cols-[auto_1fr_auto] gap-x-1">
+                                                <span className="font-bold">High:</span>
+                                                <span className="text-right">{activity.elevHighFeet?.toLocaleString()}</span>
+                                                <span>ft</span>
+                                                <span className="font-bold">Low:</span>
+                                                <span className="text-right">{activity.elevLowFeet?.toLocaleString()}</span>
+                                                <span>ft</span>
+                                            </div>
+                                        }>
+                                            <span className="cursor-help">{elevContent}</span>
+                                        </Tooltip>
+                                    ) : elevContent}
                                 </td>
                             );
                         })}
@@ -1040,7 +1196,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                 <>
                                     {renderGoalCell(`run_time_${milestone.key}`, `${milestone.label} Time`, undefined, 'duration')}
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10">
-                                        <span className="text-xs tabular-nums font-medium text-gray-400">—</span>
+                                        <span className="text-xs tabular-nums text-gray-300 dark:text-gray-700">—</span>
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
                                         <span className="text-xs text-gray-300 dark:text-gray-700">—</span>

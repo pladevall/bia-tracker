@@ -59,8 +59,26 @@ export async function POST(request: NextRequest) {
 
             const stravaActivities = await client.getAllRunningActivities(since);
 
+            // Fetch detailed data for each activity (includes HR, cadence, elev_high/low)
+            // The list endpoint doesn't include these fields
+            // Process sequentially to avoid rate limiting (Strava: 100 req/15min)
+            const detailedActivities = [];
+            for (const activity of stravaActivities) {
+                try {
+                    const detailed = await client.getActivity(activity.id);
+                    detailedActivities.push(detailed);
+                } catch (error) {
+                    console.warn(`Failed to fetch details for activity ${activity.id}:`, error);
+                    detailedActivities.push(activity); // Fall back to basic data
+                }
+                // Small delay between requests to be kind to API
+                if (stravaActivities.length > 10) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+
             // Convert and save activities
-            const convertedActivities = stravaActivities.map(convertStravaActivity);
+            const convertedActivities = detailedActivities.map(convertStravaActivity);
             const savedActivities = await saveRunningActivities(connectionId, convertedActivities);
 
             // Update sync status

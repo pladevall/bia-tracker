@@ -214,7 +214,12 @@ export async function saveRunningActivities(
         distanceMiles: number;
         durationSeconds: number;
         elevationGainFeet: number | null;
+        elevHighFeet: number | null;
+        elevLowFeet: number | null;
         averagePaceSeconds: number | null;
+        averageHeartrate: number | null;
+        maxHeartrate: number | null;
+        averageCadence: number | null;
         splits: Array<{ mile: number; timeSeconds: number; cumulativeSeconds: number }>;
     }>
 ): Promise<RunningActivity[]> {
@@ -230,7 +235,12 @@ export async function saveRunningActivities(
         distance_miles: a.distanceMiles,
         duration_seconds: a.durationSeconds,
         elevation_gain_feet: a.elevationGainFeet,
+        elev_high_feet: a.elevHighFeet,
+        elev_low_feet: a.elevLowFeet,
         average_pace_seconds: a.averagePaceSeconds,
+        average_heartrate: a.averageHeartrate,
+        max_heartrate: a.maxHeartrate,
+        average_cadence: a.averageCadence,
         splits: a.splits,
     }));
 
@@ -347,7 +357,12 @@ function mapRowToActivity(row: Record<string, unknown>): RunningActivity {
         distanceMiles: row.distance_miles as number,
         durationSeconds: row.duration_seconds as number,
         elevationGainFeet: row.elevation_gain_feet as number | null,
+        elevHighFeet: row.elev_high_feet as number | null,
+        elevLowFeet: row.elev_low_feet as number | null,
         averagePaceSeconds: row.average_pace_seconds as number | null,
+        averageHeartrate: row.average_heartrate as number | null,
+        maxHeartrate: row.max_heartrate as number | null,
+        averageCadence: row.average_cadence as number | null,
         splits: row.splits as RunningSplit[] | null,
         createdAt: row.created_at as string,
         updatedAt: row.updated_at as string,

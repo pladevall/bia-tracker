@@ -285,7 +285,12 @@ export interface RunningActivity {
   distanceMiles: number;
   durationSeconds: number;
   elevationGainFeet: number | null;
+  elevHighFeet: number | null;
+  elevLowFeet: number | null;
   averagePaceSeconds: number | null;  // Seconds per mile
+  averageHeartrate: number | null;    // bpm
+  maxHeartrate: number | null;        // bpm
+  averageCadence: number | null;      // steps per minute
   splits: RunningSplit[] | null;
   createdAt: string;
   updatedAt: string;
