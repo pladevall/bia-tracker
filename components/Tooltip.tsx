@@ -25,7 +25,9 @@ export default function Tooltip({ content, children }: TooltipProps) {
       const tooltipHeight = 80; // approximate
 
       // Determine if tooltip should appear above or below
-      const showBelow = rect.top < tooltipHeight + 10;
+      // Prefer showing below if the element is in the top half of the viewport
+      // This helps with tall tooltips getting clipped by the top edge
+      const showBelow = rect.top < window.innerHeight / 3;
       setPosition(showBelow ? 'bottom' : 'top');
 
       // Calculate position

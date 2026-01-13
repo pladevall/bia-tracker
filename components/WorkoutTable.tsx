@@ -7,7 +7,7 @@ import { Goal } from '@/lib/supabase';
 import GoalEditor from './GoalEditor';
 import Tooltip from './Tooltip';
 import { MilestoneBadge } from './MilestoneBadge';
-import { calculateLiftingMilestones, calculateRunningMilestones, ExerciseMilestones, RunningMilestone } from '@/lib/milestones';
+import { calculateLiftingMilestones, calculateRunningMilestones, ExerciseMilestones, RunningMilestone, calculate1RM } from '@/lib/milestones';
 import { generateLiftingWorkout, generateRunningWorkout, GeneratedLiftingWorkout, GeneratedRunningWorkout, getWeeklySetsPerMuscleGroup } from '@/lib/workout-generator';
 
 interface WorkoutTableProps {
@@ -1336,17 +1336,31 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                                                 <div key={part}>
                                                                     <div className="text-[10px] uppercase text-gray-500 font-bold mb-1 tracking-wider">{part}</div>
                                                                     {exercises.map((ex, i) => {
-                                                                        const singleSetVolume = (ex.sets[0]?.weightLbs || 0) * (ex.sets[0]?.targetReps || 0);
+                                                                        const set = ex.sets[0];
+                                                                        const weight = set?.weightLbs || 0;
+                                                                        const reps = set?.targetReps || 0;
+
                                                                         const milestones = liftingMilestones.get(ex.name);
-                                                                        const currentMax = milestones?.bestSetVolume?.value || 0;
-                                                                        const isPR = singleSetVolume > currentMax;
+
+                                                                        let prType = null;
+                                                                        const maxWeight = milestones?.heaviestWeight?.value || 0;
+                                                                        const maxVol = milestones?.bestSetVolume?.value || 0;
+                                                                        const max1RM = milestones?.best1RM?.value || 0;
+
+                                                                        if (weight > maxWeight) {
+                                                                            prType = 'Heaviest Weight';
+                                                                        } else if ((weight * reps) > maxVol) {
+                                                                            prType = 'Best Set Volume';
+                                                                        } else if (calculate1RM(weight, reps) > max1RM) {
+                                                                            prType = 'Best 1RM';
+                                                                        }
 
                                                                         return (<div key={i} className="mb-1.5 last:mb-0">
                                                                             <div className="flex items-center gap-2">
                                                                                 <span className="font-medium text-gray-200">{ex.name}</span>
-                                                                                {isPR && (
-                                                                                    <span className="text-[9px] bg-yellow-500/10 text-yellow-500 px-1 py-px rounded border border-yellow-500/20">
-                                                                                        Potential PR
+                                                                                {prType && (
+                                                                                    <span className="text-[9px] bg-yellow-500/10 text-yellow-500 px-1 py-px rounded border border-yellow-500/20 whitespace-nowrap">
+                                                                                        {prType}
                                                                                     </span>
                                                                                 )}
                                                                             </div>
