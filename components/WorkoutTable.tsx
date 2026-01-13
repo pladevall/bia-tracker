@@ -126,13 +126,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
     type HighlightSentiment = 'good' | 'bad' | 'neutral';
     const [highlightedRanges, setHighlightedRanges] = useState<{ metricKey: string; current: { start: Date; end: Date }; previous: { start: Date; end: Date }; sentiment: HighlightSentiment } | null>(null);
     const [editingGoal, setEditingGoal] = useState<{ metricKey: string; label: string; type?: 'number' | 'duration' | 'pace' } | null>(null);
-    const [isPushingToHevy, setIsPushingToHevy] = useState(false);
+    const [pushStatus, setPushStatus] = useState<'idle' | 'pushing' | 'success' | 'error'>('idle');
 
     // Handle pushing generated workout to Hevy
     const handlePushToHevy = async (workout: GeneratedLiftingWorkout) => {
         if (!workout) return;
 
-        setIsPushingToHevy(true);
+        setPushStatus('pushing');
         try {
             const response = await fetch('/api/hevy/routines', {
                 method: 'POST',
@@ -146,12 +146,12 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                 throw new Error(data.error || 'Failed to create routine');
             }
 
-            alert(`Routine "${data.routine.title}" created in Hevy! (${data.exercisesMapped} exercises${data.exercisesSkipped > 0 ? `, ${data.exercisesSkipped} skipped` : ''})`);
+            setPushStatus('success');
+            setTimeout(() => setPushStatus('idle'), 3000);
         } catch (e) {
             console.error('Error pushing to Hevy:', e);
-            alert(e instanceof Error ? e.message : 'Error creating routine');
-        } finally {
-            setIsPushingToHevy(false);
+            setPushStatus('error');
+            setTimeout(() => setPushStatus('idle'), 3000);
         }
     };
 
@@ -683,7 +683,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
         'YTD': 'prev year',
     };
 
-    // Get body parts that have data
+    // Get body parts that have data (including Next Workout suggestions)
     const activeBodyParts = useMemo(() => {
         const parts = new Set<string>();
         liftingWorkouts.forEach(w => {
@@ -691,11 +691,17 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                 Object.keys(w.bodyParts).forEach(p => parts.add(p));
             }
         });
+
+        // Add parts from next workout suggestion
+        if (nextLiftingWorkout) {
+            nextLiftingWorkout.muscleGroups.forEach(p => parts.add(p));
+        }
+
         // Sort by BODY_PARTS order, then append any others found
         const sortedStandard = BODY_PARTS.filter(p => parts.has(p));
         const others = Array.from(parts).filter(p => !BODY_PARTS.includes(p as any)).sort();
         return [...sortedStandard, ...others];
-    }, [liftingWorkouts]);
+    }, [liftingWorkouts, nextLiftingWorkout]);
 
     // Get running milestones that have data
     const activeMilestones = useMemo(() => {
@@ -1321,17 +1327,37 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                             <div className="flex flex-col items-center gap-1">
                                                 <Tooltip content={
                                                     <div className="text-left text-xs max-w-xs">
-                                                        <div className="font-medium mb-2 text-green-400">{nextLiftingWorkout.name}</div>
-                                                        <div className="space-y-1.5">
-                                                            {nextLiftingWorkout.exercises.slice(0, 6).map((ex, i) => (
-                                                                <div key={i} className="text-gray-300">
-                                                                    <span className="font-medium">{ex.name}</span>
-                                                                    <span className="text-gray-500"> • {ex.sets.length} sets @ {ex.sets[0]?.weightLbs}lb x {ex.sets[0]?.targetReps}</span>
+                                                        <div className="font-medium mb-3 text-green-400 border-b border-white/10 pb-1">{nextLiftingWorkout.name}</div>
+                                                        <div className="space-y-3">
+                                                            {Object.entries(nextLiftingWorkout.exercises.reduce((acc, ex) => {
+                                                                (acc[ex.bodyPart] = acc[ex.bodyPart] || []).push(ex);
+                                                                return acc;
+                                                            }, {} as Record<string, typeof nextLiftingWorkout.exercises>)).map(([part, exercises]) => (
+                                                                <div key={part}>
+                                                                    <div className="text-[10px] uppercase text-gray-500 font-bold mb-1 tracking-wider">{part}</div>
+                                                                    {exercises.map((ex, i) => {
+                                                                        const singleSetVolume = (ex.sets[0]?.weightLbs || 0) * (ex.sets[0]?.targetReps || 0);
+                                                                        const milestones = liftingMilestones.get(ex.name);
+                                                                        const currentMax = milestones?.bestSetVolume?.value || 0;
+                                                                        const isPR = singleSetVolume > currentMax;
+
+                                                                        return (<div key={i} className="mb-1.5 last:mb-0">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="font-medium text-gray-200">{ex.name}</span>
+                                                                                {isPR && (
+                                                                                    <span className="text-[9px] bg-yellow-500/10 text-yellow-500 px-1 py-px rounded border border-yellow-500/20">
+                                                                                        Potential PR
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="text-gray-400 text-[10px] pl-0.5">
+                                                                                {ex.sets.length} sets × {ex.sets[0]?.targetReps} reps @ {ex.sets[0]?.weightLbs}lb
+                                                                            </div>
+                                                                        </div>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             ))}
-                                                            {nextLiftingWorkout.exercises.length > 6 && (
-                                                                <div className="text-gray-500 italic">+{nextLiftingWorkout.exercises.length - 6} more...</div>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 }>
@@ -1343,11 +1369,16 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                                         e.stopPropagation();
                                                         handlePushToHevy(nextLiftingWorkout);
                                                     }}
-                                                    disabled={isPushingToHevy}
-                                                    className="text-[10px] bg-green-100 hover:bg-green-200 dark:bg-green-900/40 dark:hover:bg-green-900/60 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50"
+                                                    disabled={pushStatus !== 'idle'}
+                                                    className={`text-[10px] px-2 py-0.5 rounded border transition-colors disabled:opacity-80 flex items-center gap-1 ${pushStatus === 'success'
+                                                        ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                                        : pushStatus === 'error'
+                                                            ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
+                                                            : 'bg-green-100 hover:bg-green-200 dark:bg-green-900/40 dark:hover:bg-green-900/60 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
+                                                        }`}
                                                     title="Create routine in Hevy"
                                                 >
-                                                    {isPushingToHevy ? '...' : 'Push'}
+                                                    {pushStatus === 'pushing' ? '...' : pushStatus === 'success' ? '✓ Saved' : pushStatus === 'error' ? 'Error' : 'Push'}
                                                 </button>
                                             </div>
                                         ) : (
@@ -1628,7 +1659,27 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                                     </div>
                                                 </td>
                                                 <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
-                                                    <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                                    {(() => {
+                                                        const partsInNext = nextLiftingWorkout?.exercises.filter(ex => ex.bodyPart === part) || [];
+                                                        if (partsInNext.length === 0) return <span className="text-xs text-gray-300 dark:text-gray-700">—</span>;
+                                                        const totalSets = partsInNext.reduce((sum, ex) => sum + ex.sets.length, 0);
+
+                                                        return (
+                                                            <Tooltip content={
+                                                                <div className="text-left text-xs">
+                                                                    <div className="font-medium mb-1 text-green-400 uppercase text-[10px] tracking-wider">{part}</div>
+                                                                    {partsInNext.map((ex, i) => (
+                                                                        <div key={i} className="mb-1 last:mb-0">
+                                                                            <span className="font-medium text-gray-200">{ex.name}</span>
+                                                                            <span className="text-gray-400 ml-1.5 text-[10px]">{ex.sets.length} × {ex.sets[0]?.targetReps}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            }>
+                                                                <span className="text-xs tabular-nums font-medium cursor-help text-green-600 dark:text-green-400">{totalSets}</span>
+                                                            </Tooltip>
+                                                        );
+                                                    })()}
                                                 </td>
                                             </>
                                         }
