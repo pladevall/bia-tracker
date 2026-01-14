@@ -5,7 +5,8 @@ import { useState, useEffect, useCallback } from 'react';
 import DataTable from '@/components/DataTable';
 import IntegrationTabs from '@/components/IntegrationTabs';
 import WorkoutTable from '@/components/WorkoutTable';
-import { BIAEntry, BodyspecScan, RunningActivity, LiftingWorkout } from '@/lib/types';
+import { SleepTable } from '@/components/SleepTable';
+import { BIAEntry, BodyspecScan, RunningActivity, LiftingWorkout, SleepEntry } from '@/lib/types';
 import { parsePDFFile } from '@/lib/client-pdf-parser';
 import ThemeToggle from '@/components/ThemeToggle';
 import { getEntriesFromDb, saveEntryToDb, deleteEntryFromDb, migrateFromLocalStorage, getPendingImages, deletePendingImage, saveOcrDebug, getGoals, saveGoal, deleteGoal, Goal } from '@/lib/supabase';
@@ -20,6 +21,9 @@ export default function Home() {
   const [hevyConnections, setHevyConnections] = useState<any[]>([]);
   const [runningActivities, setRunningActivities] = useState<RunningActivity[]>([]);
   const [liftingWorkouts, setLiftingWorkouts] = useState<LiftingWorkout[]>([]);
+  // Sleep tracking state
+  const [sleepEntries, setSleepEntries] = useState<SleepEntry[]>([]);
+
   const [hiddenScans, setHiddenScans] = useState<Set<string>>(() => {
     // Load from localStorage on init
     if (typeof window !== 'undefined') {
@@ -164,6 +168,18 @@ export default function Home() {
     }
   }, []);
 
+  const loadSleepData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/sleep/entries?limit=30');
+      if (res.ok) {
+        const data = await res.json();
+        setSleepEntries(data);
+      }
+    } catch (err) {
+      console.error('Failed to load sleep data:', err);
+    }
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -234,6 +250,9 @@ export default function Home() {
 
         // Load workout data
         await loadWorkoutData();
+
+        // Load sleep data
+        await loadSleepData();
       } catch (err) {
         console.error('Failed to load entries:', err);
         setError('Failed to load data. Please check your connection.');
@@ -243,7 +262,7 @@ export default function Home() {
     };
 
     init();
-  }, [loadBodyspecData, loadWorkoutData]);
+  }, [loadBodyspecData, loadWorkoutData, loadSleepData]);
 
   const handleUpload = useCallback(async (files: File[]) => {
     setIsLoading(true);
@@ -396,6 +415,20 @@ export default function Home() {
           </section>
         )}
 
+        {/* Sleep Section - show if there are any sleep entries */}
+        {sleepEntries.length > 0 && (
+          <section className="mb-6 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+              <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                Sleep Tracking
+              </h2>
+            </div>
+            <div className="p-4">
+              <SleepTable entries={sleepEntries} />
+            </div>
+          </section>
+        )}
+
         <section className="mb-6 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
           <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
             <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -411,6 +444,7 @@ export default function Home() {
             onDeleteGoal={handleDeleteGoal}
           />
         </section>
+
 
         {/* Unified Integrations Section */}
         <IntegrationTabs

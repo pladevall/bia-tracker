@@ -393,10 +393,53 @@ export type BodyPart = typeof BODY_PARTS[number];
 export type WorkoutType = 'run' | 'lifting' | 'all';
 export type VolumePeriod = 'WTD' | 'MTD' | 'QTD' | 'YTD' | 'PY';
 
-// Unified workout entry for display in WorkoutTable
 export interface WorkoutEntry {
   date: string;
   type: 'run' | 'lifting';
   runningActivity?: RunningActivity;
   liftingWorkout?: LiftingWorkout;
+}
+
+// ========================================
+// Sleep Tracking Types
+// ========================================
+
+export interface SleepStages {
+  awakeMinutes: number;
+  remMinutes: number;
+  coreMinutes: number;
+  deepMinutes: number;
+  inBedMinutes: number;
+  totalSleepMinutes: number;
+}
+
+export interface SleepScoreBreakdown {
+  duration: { score: number; max: number };
+  bedtime: { score: number; max: number };
+  interruptions: { score: number; max: number };
+}
+
+export interface SleepEntry {
+  id: string;
+  sleepDate: string;
+  sleepScore: number;
+  durationScore: number;
+  bedtimeScore: number;
+  interruptionScore: number;
+  data: {
+    stages: SleepStages;
+    interruptions: { count: number; totalMinutes: number };
+    scoreBreakdown?: SleepScoreBreakdown;
+    sleepStart: string;
+    sleepEnd: string;
+    samples?: any[]; // Raw samples if needed
+  };
+  createdAt?: string;
+}
+
+export interface SleepUserPreferences {
+  targetBedtime: string;
+  targetWakeTime: string;
+  targetDurationMinutes: number;
+  bedtimeWindowMinutes: number;
 }
