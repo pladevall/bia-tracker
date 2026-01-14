@@ -203,9 +203,12 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ success: true, processed: results.length, results });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error processing webhook:', error);
-        return NextResponse.json({ error: 'Internal Server Error', details: String(error) }, { status: 500 });
+        return NextResponse.json({
+            error: 'Internal Server Error',
+            details: error.message || JSON.stringify(error, Object.getOwnPropertyNames(error))
+        }, { status: 500 });
     }
 }
 
