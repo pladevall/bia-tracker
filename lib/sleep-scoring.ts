@@ -36,12 +36,29 @@ export function calculateBedtimeScore(
     try {
         // Parse times to minutes from midnight
         const getMinutes = (timeStr: string) => {
-            // Handle full ISO date strings by extracting time part
-            const timePart = timeStr.includes('T')
-                ? new Date(timeStr).toLocaleTimeString('en-US', { hour12: false })
-                : timeStr;
+            // Handle space-separated dates from Health Auto Export Aggregation (e.g. "2026-01-07 00:00:00 -0800")
+            // Ensure we extract just the time HH:MM:SS
+            let timePart = timeStr;
+
+            if (timeStr.includes('T')) {
+                // ISO format
+                timePart = new Date(timeStr).toLocaleTimeString('en-US', { hour12: false });
+            } else if (timeStr.includes(' ')) {
+                // "YYYY-MM-DD HH:MM:SS -TZ"
+                // Split by space and take the second part (index 1) which should be HH:MM:SS
+                const parts = timeStr.split(' ');
+                if (parts.length >= 2) {
+                    timePart = parts[1];
+                }
+            }
 
             const [hours, minutes] = timePart.split(':').map(Number);
+
+            // Validation check
+            if (isNaN(hours) || isNaN(minutes)) {
+                throw new Error(`Invalid time format: ${timeStr}`);
+            }
+
             // Handle late night times (e.g., 01:00) as next day for comparison if target is late
             // For simplicity, we'll normalize everything to minutes from previous day's noon
             // Noon = 720, Midnight = 1440/0
