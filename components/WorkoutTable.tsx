@@ -2016,7 +2016,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                         <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
-                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        {nextRunningWorkout ? (
+                                            <span className="text-xs tabular-nums font-medium text-green-600 dark:text-green-400">
+                                                {formatDuration(nextRunningWorkout.estimatedDurationSeconds)}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        )}
                                     </td>
                                 </>
                             }
@@ -2055,7 +2061,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                         <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
-                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        {nextRunningWorkout ? (
+                                            <span className="text-xs tabular-nums font-medium text-green-600 dark:text-green-400">
+                                                {formatPace(nextRunningWorkout.targetPaceSeconds)}<span className="text-gray-400">/mi</span>
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        )}
                                     </td>
                                 </>
                             }
@@ -2113,7 +2125,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                         })()}
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
-                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        {nextRunningWorkout?.projectedAvgHeartrate ? (
+                                            <span className="text-xs tabular-nums font-medium text-green-600 dark:text-green-400">
+                                                {nextRunningWorkout.projectedAvgHeartrate} <span className="text-gray-400">bpm</span>
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        )}
                                     </td>
                                 </>
                             }
@@ -2171,7 +2189,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                         })()}
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
-                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        {nextRunningWorkout?.projectedMaxHeartrate ? (
+                                            <span className="text-xs tabular-nums font-medium text-green-600 dark:text-green-400">
+                                                {nextRunningWorkout.projectedMaxHeartrate} <span className="text-gray-400">bpm</span>
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        )}
                                     </td>
                                 </>
                             }
@@ -2229,7 +2253,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                         })()}
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-green-50/30 dark:bg-green-900/10">
-                                        <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        {nextRunningWorkout?.projectedCadence ? (
+                                            <span className="text-xs tabular-nums font-medium text-green-600 dark:text-green-400">
+                                                {nextRunningWorkout.projectedCadence} <span className="text-gray-400">spm</span>
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-gray-300 dark:text-gray-700">—</span>
+                                        )}
                                     </td>
                                 </>
                             }

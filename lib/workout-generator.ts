@@ -81,6 +81,9 @@ export interface GeneratedRunningWorkout {
   distanceMiles: number;
   targetPaceSeconds: number; // seconds per mile
   estimatedDurationSeconds: number;
+  projectedAvgHeartrate: number | null;
+  projectedMaxHeartrate: number | null;
+  projectedCadence: number | null;
   notes?: string;
 }
 
@@ -483,6 +486,51 @@ export function getRecentAveragePace(activities: RunningActivity[], count: numbe
 }
 
 /**
+ * Get average heart rate from recent runs
+ */
+export function getRecentAverageHeartrate(activities: RunningActivity[], count: number = 5): number | null {
+  const sorted = [...activities]
+    .filter(a => a.averageHeartrate != null)
+    .sort((a, b) => new Date(b.activityDate).getTime() - new Date(a.activityDate).getTime())
+    .slice(0, count);
+
+  if (sorted.length === 0) return null;
+
+  const total = sorted.reduce((sum, a) => sum + (a.averageHeartrate || 0), 0);
+  return Math.round(total / sorted.length);
+}
+
+/**
+ * Get max heart rate from recent runs
+ */
+export function getRecentMaxHeartrate(activities: RunningActivity[], count: number = 5): number | null {
+  const sorted = [...activities]
+    .filter(a => a.maxHeartrate != null)
+    .sort((a, b) => new Date(b.activityDate).getTime() - new Date(a.activityDate).getTime())
+    .slice(0, count);
+
+  if (sorted.length === 0) return null;
+
+  const total = sorted.reduce((sum, a) => sum + (a.maxHeartrate || 0), 0);
+  return Math.round(total / sorted.length);
+}
+
+/**
+ * Get cadence from recent runs
+ */
+export function getRecentCadence(activities: RunningActivity[], count: number = 5): number | null {
+  const sorted = [...activities]
+    .filter(a => a.averageCadence != null)
+    .sort((a, b) => new Date(b.activityDate).getTime() - new Date(a.activityDate).getTime())
+    .slice(0, count);
+
+  if (sorted.length === 0) return null;
+
+  const total = sorted.reduce((sum, a) => sum + (a.averageCadence || 0), 0);
+  return Math.round(total / sorted.length);
+}
+
+/**
  * Get suggested distance for a workout type
  */
 function getSuggestedDistance(
@@ -607,6 +655,9 @@ export function generateRunningWorkout(activities: RunningActivity[]): Generated
       targetPaceSeconds: 9 * 60, // 9:00/mile
       estimatedDurationSeconds: 3 * 9 * 60,
       notes: 'Start easy! Focus on comfortable effort.',
+      projectedAvgHeartrate: null,
+      projectedMaxHeartrate: null,
+      projectedCadence: null,
     };
   }
 
@@ -618,6 +669,9 @@ export function generateRunningWorkout(activities: RunningActivity[]): Generated
   const previousWeekMileage = getPreviousWeekMileage(activities);
   const completedTypes = getWeeklyWorkoutTypes(activities);
   const recentPace = getRecentAveragePace(activities);
+  const projectedAvgHeartrate = getRecentAverageHeartrate(activities);
+  const projectedMaxHeartrate = getRecentMaxHeartrate(activities);
+  const projectedCadence = getRecentCadence(activities);
 
   // Choose workout type
   const workoutType = chooseNextWorkoutType(completedTypes, dayOfWeek);
@@ -644,6 +698,9 @@ export function generateRunningWorkout(activities: RunningActivity[]): Generated
     distanceMiles: distance,
     targetPaceSeconds: pace,
     estimatedDurationSeconds: estimatedDuration,
+    projectedAvgHeartrate,
+    projectedMaxHeartrate,
+    projectedCadence,
     notes: getWorkoutNotes(workoutType, distance, pace, currentWeekMileage),
   };
 }
