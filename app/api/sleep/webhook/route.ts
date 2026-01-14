@@ -96,6 +96,9 @@ export async function POST(req: NextRequest) {
         const preferences = await getSleepPreferences();
 
         for (const [date, daysSamples] of Object.entries(groupedByDate)) {
+            if (daysSamples.length > 0) {
+                console.log(`Processing ${date}, sample 0: start=${daysSamples[0].startDate}, end=${daysSamples[0].endDate}`);
+            }
             // Aggregate stages
             const stages: SleepStages = {
                 awakeMinutes: 0,
@@ -160,8 +163,24 @@ export async function POST(req: NextRequest) {
             }
 
             // Calculate Scores
-            const sleepStart = new Date(sleepStartMs).toISOString();
-            const sleepEnd = new Date(sleepEndMs).toISOString();
+            if (sleepStartMs === Number.MAX_SAFE_INTEGER || sleepEndMs === 0) {
+                console.warn(`Invalid sleep times for date ${date}: start=${sleepStartMs}, end=${sleepEndMs}`);
+                // fallback or skip?
+                // skipping to avoid crash
+                // actually, let's try to proceed carefully
+            }
+
+            let sleepStart: string;
+            let sleepEnd: string;
+
+            try {
+                sleepStart = new Date(sleepStartMs).toISOString();
+                sleepEnd = new Date(sleepEndMs).toISOString();
+            } catch (e) {
+                console.error(`Date conversion error for ${date}:`, e, { sleepStartMs, sleepEndMs });
+                // Fallback to "now" or skip, but better to skip saving this entry if it's corrupt
+                continue;
+            }
 
             const { totalScore, durationScore, bedtimeScore, interruptionScore } = calculateSleepScore({
                 totalSleepMinutes: stages.totalSleepMinutes,
