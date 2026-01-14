@@ -57,8 +57,23 @@ export async function POST(req: NextRequest) {
         // A gap of > 4 hours usually implies a different sleep session
         // For now, let's process the most recent night found in the data
 
+        // 1. Filter out invalid data first
+        const validSamples = sleepMetric.data.filter(s => {
+            const start = new Date(s.startDate).getTime();
+            const end = new Date(s.endDate).getTime();
+            if (isNaN(start) || isNaN(end)) {
+                console.warn('Skipping invalid sample:', s);
+                return false;
+            }
+            return true;
+        });
+
+        if (validSamples.length === 0) {
+            return NextResponse.json({ message: 'No valid sleep samples found' }, { status: 200 });
+        }
+
         // Sort samples by date
-        const samples = sleepMetric.data.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+        const samples = validSamples.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
         // Helpers
         const getDurationMinutes = (sample: typeof samples[0]) => sample.duration / 60;
