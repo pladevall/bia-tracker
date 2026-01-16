@@ -329,8 +329,8 @@ export function MonthRow({ month, events }: MonthRowProps) {
                                 key={event.id}
                                 data-event
                                 onMouseDown={(e) => {
-                                    // Check if we're clicking on a resize handle
-                                    if (e.target !== e.currentTarget) return;
+                                    // Don't drag if clicking on a resize handle
+                                    if ((e.target as HTMLElement).closest('[data-resize-handle]')) return;
                                     handleDragStart(event, e);
                                 }}
                                 onClick={(e) => {
@@ -356,6 +356,7 @@ export function MonthRow({ month, events }: MonthRowProps) {
                             >
                                 {/* Start Resize Handle */}
                                 <div
+                                    data-resize-handle
                                     onMouseDown={(e) => {
                                         e.stopPropagation();
                                         handleResizeStart(event, 'start');
@@ -371,6 +372,7 @@ export function MonthRow({ month, events }: MonthRowProps) {
 
                                 {/* End Resize Handle */}
                                 <div
+                                    data-resize-handle
                                     onMouseDown={(e) => {
                                         e.stopPropagation();
                                         handleResizeStart(event, 'end');
