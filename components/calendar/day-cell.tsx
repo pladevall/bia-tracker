@@ -116,14 +116,15 @@ export function DayCell({ date, month, events }: DayCellProps) {
                     )}
                 </div>
             </div>
+        </div>
 
-            <QuickEventMenu
-                date={date}
-                isOpen={!!contextMenu}
-                position={contextMenu || { x: 0, y: 0 }}
-                onClose={() => setContextMenu(null)}
-                onEventCreated={refreshEvents}
-            />
+        <QuickEventMenu
+            date={date}
+            isOpen={!!contextMenu}
+            position={contextMenu || { x: 0, y: 0 }}
+            onClose={() => setContextMenu(null)}
+            onEventCreated={refreshEvents}
+        />
         </>
     );
 }
