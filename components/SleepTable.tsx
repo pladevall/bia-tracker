@@ -76,12 +76,15 @@ export function SleepTable({ entries }: SleepTableProps) {
         const diff = currentValue - comparisonValue;
         const improved = diff === 0 ? null : (higherIsBetter ? diff > 0 : diff < 0);
         const { text, color } = formatTrendValue(diff, improved);
+        const periodLabel = getTrendPeriodLabel(trendPeriod);
 
         return (
             <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-800/20">
-                <span className={`text-xs tabular-nums font-medium ${color}`}>
-                    {text}
-                </span>
+                <Tooltip content={`Compared to ${periodLabel} ago: ${comparisonValue.toFixed(1)}`}>
+                    <span className={`text-xs tabular-nums font-medium cursor-help ${color}`}>
+                        {text}
+                    </span>
+                </Tooltip>
             </td>
         );
     };
@@ -95,7 +98,7 @@ export function SleepTable({ entries }: SleepTableProps) {
                     <div className="flex flex-col items-center gap-1">
                         <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Trend</span>
                         <div className="flex gap-0.5">
-                            {(['7', '30'] as TrendPeriod[]).map((period) => (
+                            {(['7', '30', '90', 'YTD'] as TrendPeriod[]).map((period) => (
                                 <button
                                     key={period}
                                     onClick={() => setTrendPeriod(period)}

@@ -490,7 +490,7 @@ export default function DataTable({ entries, goals, bodyspecScans = [], onDelete
               <div className="flex flex-col items-center gap-1">
                 <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Trend</span>
                 <div className="flex gap-0.5">
-                  {(['30', '60', '90', 'YTD'] as TrendPeriod[]).map((period) => (
+                  {(['7', '30', '90', 'YTD'] as TrendPeriod[]).map((period) => (
                     <button
                       key={period}
                       onClick={() => setTrendPeriod(period)}

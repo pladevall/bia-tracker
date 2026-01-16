@@ -494,7 +494,7 @@ export default function Home() {
           <section className="mb-6 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
             <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
               <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                Sleep Tracking
+                Sleep
               </h2>
             </div>
             <div>
