@@ -298,7 +298,7 @@ export function MonthRow({ month, events }: MonthRowProps) {
                 </div>
 
                 {/* Events Layer - Absolute positioned strips */}
-                <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute inset-0 pointer-events-none z-20">
                     {positionedEvents.map((event) => {
                         const cat = CALENDAR_CATEGORIES[event.category];
                         const dayWidth = 100 / 31; // Each day is 1/31 of the width
@@ -327,6 +327,7 @@ export function MonthRow({ month, events }: MonthRowProps) {
                         return (
                             <div
                                 key={event.id}
+                                data-event
                                 onMouseDown={(e) => {
                                     // Check if we're clicking on a resize handle
                                     if (e.target !== e.currentTarget) return;

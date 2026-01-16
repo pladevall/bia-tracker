@@ -73,6 +73,10 @@ export function DayCell({ date, month, events }: DayCellProps) {
     };
 
     const handleContextMenu = (e: React.MouseEvent) => {
+        // Don't show context menu if right-clicking on an event
+        if ((e.target as HTMLElement).closest('[data-event]')) {
+            return;
+        }
         e.preventDefault();
         setContextMenu({ x: e.clientX, y: e.clientY });
     };
