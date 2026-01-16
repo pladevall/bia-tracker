@@ -80,6 +80,7 @@ export interface MetricDefinition {
   normalRange?: NormalRange;
   higherIsBetter?: boolean;
   category: 'header' | 'core' | 'composition' | 'additional' | 'segmental-muscle' | 'segmental-fat' | 'recommendations';
+  description?: string;
 }
 
 export const METRIC_DEFINITIONS: MetricDefinition[] = [
@@ -87,11 +88,11 @@ export const METRIC_DEFINITIONS: MetricDefinition[] = [
   { key: 'fitnessScore', label: 'Fitness Score', unit: '/100', higherIsBetter: true, category: 'header' },
 
   // Core Metrics
-  { key: 'weight', label: 'Weight', unit: 'lb', normalRange: { min: 136.6, max: 184.6 }, higherIsBetter: false, category: 'core' },
-  { key: 'bodyFatPercentage', label: 'Body Fat %', unit: '%', normalRange: { min: 6, max: 25 }, higherIsBetter: false, category: 'core' },
-  { key: 'bodyFatMass', label: 'Body Fat Mass', unit: 'lb', normalRange: { min: 19.4, max: 39 }, higherIsBetter: false, category: 'core' },
-  { key: 'bmi', label: 'BMI', unit: 'kg/m²', normalRange: { min: 18.5, max: 25 }, higherIsBetter: false, category: 'core' },
-  { key: 'skeletalMuscle', label: 'Skeletal Muscle', unit: 'lb', normalRange: { min: 69.6, max: 85 }, higherIsBetter: true, category: 'core' },
+  { key: 'weight', label: 'Weight', unit: 'lb', normalRange: { min: 136.6, max: 184.6 }, higherIsBetter: false, category: 'core', description: 'Total body mass including water, fat, muscle, and bone.' },
+  { key: 'bodyFatPercentage', label: 'Body Fat %', unit: '%', normalRange: { min: 6, max: 25 }, higherIsBetter: false, category: 'core', description: 'The percentage of total body weight composed of fat tissue.' },
+  { key: 'bodyFatMass', label: 'Body Fat Mass', unit: 'lb', normalRange: { min: 19.4, max: 39 }, higherIsBetter: false, category: 'core', description: 'Total weight of fat tissue in the body.' },
+  { key: 'bmi', label: 'BMI', unit: 'kg/m²', normalRange: { min: 18.5, max: 25 }, higherIsBetter: false, category: 'core', description: 'Body Mass Index: a measure of body fat based on height and weight.' },
+  { key: 'skeletalMuscle', label: 'Skeletal Muscle', unit: 'lb', normalRange: { min: 69.6, max: 85 }, higherIsBetter: true, category: 'core', description: 'Weight of muscles attached to the skeleton (the type you can grow through exercise).' },
 
   // Body Composition
   { key: 'bodyWater', label: 'Body Water', unit: 'L', normalRange: { min: 39, max: 50.7 }, higherIsBetter: true, category: 'composition' },
@@ -335,6 +336,7 @@ export interface LiftingExercise {
   sets: number;
   reps: number;
   weightLbs: number | null;
+  exerciseType?: 'compound' | 'accessory';
 }
 
 export interface LiftingWorkout {
@@ -428,8 +430,12 @@ export interface SleepEntry {
   interruptionScore: number;
   data: {
     stages: SleepStages;
-    interruptions: { count: number; totalMinutes: number };
-    scoreBreakdown?: SleepScoreBreakdown;
+    interruptions: { count: number; totalMinutes: number; wakeUpsCount?: number; interruptionsDurationMinutes?: number };
+    scoreBreakdown?: {
+      duration: { score: number; max: number };
+      bedtime: { score: number; max: number };
+      interruptions: { score: number; max: number };
+    };
     sleepStart: string;
     sleepEnd: string;
     samples?: any[]; // Raw samples if needed

@@ -125,6 +125,13 @@ function formatTrendValue(diff: number, isVolume: boolean): { text: string; colo
     return { text, color };
 }
 
+const COMPOUND_EXERCISES = [
+    'bench press', 'deadlift', 'squat', 'overhead press', 'pull up', 'pullup',
+    'dip', 'barbell row', 'bent over row', 'sumo deadlift', 'front squat',
+    'romanian deadlift', 'shoulder press', 'military press', 'weighted pull up',
+    'leg press', 't-bar row', 'clean and jerk', 'snatch'
+] as const;
+
 export default function WorkoutTable({ runningActivities, liftingWorkouts, goals, onSaveGoal, onDeleteGoal }: WorkoutTableProps) {
     const [workoutType, setWorkoutType] = useState<WorkoutType>('all');
     const [volumePeriod, setVolumePeriod] = useState<VolumePeriod>('WTD');
@@ -686,10 +693,10 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
 
     // Trend label mapping
     const periodLabels: Record<TrendPeriod, string> = {
-        'WTD': 'prev week',
-        'MTD': 'prev month',
-        'QTD': 'prev quarter',
-        'YTD': 'prev year',
+        'WTD': 'previous week (same days)',
+        'MTD': 'previous month (same days)',
+        'QTD': 'previous quarter (same days)',
+        'YTD': 'previous year (same period)',
     };
 
     // Get body parts that have data (including Next Workout suggestions)
@@ -763,9 +770,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
         });
 
         // Convert to sorted arrays
-        const formatted: Record<string, Array<{ name: string; bodyPart: string; occurrences: Map<string, { sets: number; reps: number; weightLbs: number | null }> }>> = {};
+        const formatted: Record<string, Array<{ name: string; bodyPart: string; exerciseType?: 'compound' | 'accessory'; occurrences: Map<string, { sets: number; reps: number; weightLbs: number | null }> }>> = {};
         Object.entries(result).forEach(([bodyPart, exerciseMap]) => {
             formatted[bodyPart] = Array.from(exerciseMap.values())
+                .map(ex => ({
+                    ...ex,
+                    exerciseType: (COMPOUND_EXERCISES.some(c => ex.name.toLowerCase().includes(c)) ? 'compound' : 'accessory') as 'compound' | 'accessory'
+                }))
                 .sort((a, b) => a.name.localeCompare(b.name));
         });
         return formatted;
@@ -907,7 +918,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                         <div className="flex flex-col items-center gap-1">
                             <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Workload</span>
                             <div className="flex gap-0.5">
-                                {(['sets', 'volume'] as VolumeDisplayMode[]).map(mode => (
+                                {workoutType !== 'run' && (['sets', 'volume'] as VolumeDisplayMode[]).map(mode => (
                                     <button
                                         key={mode}
                                         onClick={() => setVolumeDisplayMode(mode)}
@@ -1611,14 +1622,17 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                     <TimeSeriesRow
                                         label={
                                             <span
-                                                className={`capitalize inline-flex items-center gap-1 ${hasExercises ? 'cursor-pointer hover:text-blue-600 dark:hover:text-blue-400' : ''}`}
+                                                className={`capitalize inline-flex items-center gap-1 ${hasExercises ? 'cursor-pointer hover:text-blue-600 dark:hover:text-blue-400' : 'text-gray-400 opacity-70'}`}
                                                 onClick={() => hasExercises && toggleBodyPart(part)}
                                             >
-                                                {hasExercises && (
-                                                    <span className="text-[10px] text-gray-400 dark:text-gray-500 w-3 inline-block transition-transform" style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-                                                        ▶
-                                                    </span>
-                                                )}
+                                                <svg
+                                                    className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''} ${hasExercises ? 'text-gray-400' : 'text-gray-300 dark:text-gray-600'}`}
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                >
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
                                                 {part}
                                             </span>
                                         }
@@ -1752,8 +1766,18 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                             <TimeSeriesRow
                                                 key={exerciseKey}
                                                 label={
-                                                    <span className="pl-5 text-[11px] text-gray-600 dark:text-gray-400">
+                                                    <span className="pl-5 text-[11px] text-gray-600 dark:text-gray-400 inline-flex items-center gap-1.5">
                                                         {exercise.name}
+                                                        {exercise.exerciseType && (
+                                                            <Tooltip content={exercise.exerciseType === 'compound' ? 'Compound Movement' : 'Accessory Movement'}>
+                                                                <span className={`px-1 rounded-[2px] text-[8px] font-bold uppercase tracking-wider ${exercise.exerciseType === 'compound'
+                                                                    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+                                                                    : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                                                                    }`}>
+                                                                    {exercise.exerciseType === 'compound' ? 'C' : 'A'}
+                                                                </span>
+                                                            </Tooltip>
+                                                        )}
                                                     </span>
                                                 }
                                                 fixedContent={
@@ -1899,13 +1923,15 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                         </span>
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
-                                        <span className="text-xs tabular-nums text-gray-600 dark:text-gray-400">
-                                            {(() => {
-                                                const runCount = workoutCounts.runningDatesInRange.size;
-                                                if (runCount === 0) return '—';
-                                                return (runningVolume.totalMiles / runCount).toFixed(1);
-                                            })()}
-                                        </span>
+                                        <Tooltip content="Average miles per run for the selected period">
+                                            <span className="text-xs tabular-nums text-gray-600 dark:text-gray-400 cursor-help border-b border-dotted border-gray-300 dark:border-gray-600">
+                                                {(() => {
+                                                    const runCount = workoutCounts.runningDatesInRange.size;
+                                                    if (runCount === 0) return '—';
+                                                    return (runningVolume.totalMiles / runCount).toFixed(1);
+                                                })()}
+                                            </span>
+                                        </Tooltip>
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
                                         {(() => {
@@ -2237,7 +2263,9 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                         </span>
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
-                                        <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
+                                        <Tooltip content="Average cadence per run for the selected period">
+                                            <span className="text-xs text-gray-300 dark:text-gray-600 cursor-help">—</span>
+                                        </Tooltip>
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
                                         {(() => {
@@ -2246,7 +2274,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                             if (!current || !previous) return <span className="text-xs text-gray-300 dark:text-gray-600">—</span>;
 
                                             const diff = current - previous;
-                                            const { text, color } = formatTrendValue(diff, false);
+                                            const { text, color } = formatTrendValue(diff, diff > 0);
 
                                             return (
                                                 <Tooltip content={
@@ -2301,13 +2329,15 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                         </span>
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
-                                        <span className="text-xs tabular-nums text-gray-600 dark:text-gray-400">
-                                            {(() => {
-                                                const runCount = workoutCounts.runningDatesInRange.size;
-                                                if (runCount === 0 || runningVolume.totalElevationGain === 0) return '—';
-                                                return formatVolume(runningVolume.totalElevationGain / runCount);
-                                            })()}
-                                        </span>
+                                        <Tooltip content="Average elevation gain per run for the selected period">
+                                            <span className="text-xs tabular-nums text-gray-600 dark:text-gray-400 cursor-help border-b border-dotted border-gray-300 dark:border-gray-600">
+                                                {(() => {
+                                                    const runCount = workoutCounts.runningDatesInRange.size;
+                                                    if (runCount === 0 || runningVolume.totalElevationGain === 0) return '—';
+                                                    return formatVolume(runningVolume.totalElevationGain / runCount);
+                                                })()}
+                                            </span>
+                                        </Tooltip>
                                     </td>
                                     <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/20">
                                         {(() => {
@@ -2316,7 +2346,7 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                                             if (current === 0 && previous === 0) return <span className="text-xs text-gray-300 dark:text-gray-600">—</span>;
 
                                             const diff = current - previous;
-                                            const { text, color } = formatTrendValue(diff, false);
+                                            const { text, color } = formatTrendValue(diff, diff > 0);
 
                                             return (
                                                 <Tooltip content={

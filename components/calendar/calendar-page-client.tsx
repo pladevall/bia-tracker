@@ -7,6 +7,7 @@ import { EventModal } from './event-modal';
 import { BatchInputMode } from './batch-input-mode';
 import ThemeToggle from '@/components/ThemeToggle';
 import { CalendarEvent } from '@/types/calendar';
+import { Plus } from 'lucide-react';
 
 interface CalendarPageClientProps {
     initialEvents: CalendarEvent[];
@@ -39,7 +40,17 @@ export function CalendarPageClient({ initialEvents }: CalendarPageClientProps) {
                             Year at a Glance
                         </p>
                     </div>
-                    <ThemeToggle />
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setBatchModeOpen(true)}
+                            title="Batch input mode (Cmd+Shift+B)"
+                            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        >
+                            <Plus size={16} />
+                            Batch Add
+                        </button>
+                        <ThemeToggle />
+                    </div>
                 </header>
 
                 {/* Content Card matching main app section style */}

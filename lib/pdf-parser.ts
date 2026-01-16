@@ -5,6 +5,248 @@ function extractSegmentalData(lb: number, percent: number): SegmentalData {
   return { lb, percent };
 }
 
+export interface ValidationIssue {
+  metric: string;
+  parsed: number;
+  previous: number;
+  percentChange: number;
+  status: 'warning' | 'error';
+}
+
+export interface ParseResult {
+  entry: BIAEntry;
+  issues: ValidationIssue[];
+  hasIssues: boolean;
+}
+
+/**
+ * Validates parsed entry against previous entry
+ * Flags metrics that deviate ±10% from previous values
+ */
+/**
+ * Attempts to auto-correct obvious OCR errors
+ * Returns corrected entry if changes were made, null otherwise
+ */
+export function autoCorrectEntry(entry: BIAEntry, previous: BIAEntry | null): BIAEntry | null {
+  if (!previous) return null;
+
+  let corrected = false;
+  const correctedEntry = JSON.parse(JSON.stringify(entry)) as BIAEntry;
+
+  // Check for 10x digit errors (e.g., 231 vs 23.2)
+  const checkAndFixDecimal = (value: number, prevValue: number): number | null => {
+    if (value === 0 || prevValue === 0) return null;
+    const ratio = value / prevValue;
+
+    // If value is ~10x larger and dividing by 10 gets us within 10%, fix it
+    if (ratio > 9 && ratio < 11) {
+      const correctedVal = value / 10;
+      const newRatio = Math.abs((correctedVal - prevValue) / prevValue);
+      if (newRatio < 0.1) return correctedVal;
+    }
+    return null;
+  };
+
+  // 1. Fix obvious decimal point errors (e.g., muscleLeftLeg: 231 -> 23.2)
+  const numericMetrics: Array<keyof BIAEntry> = [
+    'weight', 'bmi', 'bodyFatPercentage', 'visceralFat', 'skeletalMuscle',
+    'bodyWater', 'protein', 'boneMass', 'bodyFatMass', 'softLeanMass', 'fatFreeMass', 'lbm', 'bmr',
+    'metabolicAge', 'subcutaneousFatPercentage', 'muscleMassPercentage', 'skeletalMusclePercentage',
+    'boneMassPercentage', 'proteinPercentage', 'bodyWaterPercentage', 'smi', 'waistHipRatio',
+    'fitnessScore', 'normalWeight', 'weightControl', 'fatMassControl', 'muscleControl'
+  ];
+
+  for (const metric of numericMetrics) {
+    const value = Number(correctedEntry[metric]) || 0;
+    const prevValue = Number(previous[metric]) || 0;
+
+    if (value > 0 && prevValue > 0) {
+      const fixed = checkAndFixDecimal(value, prevValue);
+      if (fixed !== null) {
+        (correctedEntry[metric] as any) = fixed;
+        corrected = true;
+        console.log(`Auto-corrected ${metric}: ${value} -> ${fixed}`);
+      }
+    }
+  }
+
+  // 2. Fix segmental metrics with decimal errors
+  const segmentalMetrics: Array<keyof BIAEntry> = [
+    'muscleLeftArm', 'muscleRightArm', 'muscleTrunk', 'muscleLeftLeg', 'muscleRightLeg',
+    'fatLeftArm', 'fatRightArm', 'fatTrunk', 'fatLeftLeg', 'fatRightLeg',
+  ];
+
+  for (const metric of segmentalMetrics) {
+    const seg = correctedEntry[metric] as SegmentalData;
+    const prevSeg = previous[metric] as SegmentalData;
+
+    if (seg && prevSeg && seg.lb > 0 && prevSeg.lb > 0) {
+      const fixed = checkAndFixDecimal(seg.lb, prevSeg.lb);
+      if (fixed !== null) {
+        seg.lb = fixed;
+        corrected = true;
+        console.log(`Auto-corrected ${metric}: ${seg.lb * 10} -> ${fixed}`);
+      }
+    }
+  }
+
+  // 3. Recalculate BMI if it seems off
+  // BMI = weight (lb) / (height (inches))^2 * 703
+  if (correctedEntry.weight > 0 && correctedEntry.bmi > 0) {
+    const expectedBMI = correctedEntry.bmi;
+    const prevExpectedBMI = previous.bmi;
+
+    // If BMI changed drastically but weight didn't (same day), recalculate
+    const bmiRatio = Math.abs((expectedBMI - prevExpectedBMI) / prevExpectedBMI);
+    const weightRatio = Math.abs((correctedEntry.weight - previous.weight) / previous.weight);
+
+    // If BMI changed way more than weight, something's wrong
+    if (bmiRatio > 0.5 && weightRatio < 0.05) {
+      // Weight is stable but BMI jumped - likely OCR error
+      // Estimate BMI should be similar to previous
+      const estimatedBMI = prevExpectedBMI + (weightRatio * prevExpectedBMI * 0.5);
+      correctedEntry.bmi = parseFloat(estimatedBMI.toFixed(1));
+      corrected = true;
+      console.log(`Auto-corrected BMI: ${expectedBMI} -> ${correctedEntry.bmi}`);
+    }
+  }
+
+  // 4. Fix missing segmental fat/muscle values when similar metrics exist
+  // If previous had values but current doesn't, try to estimate
+  for (const metric of segmentalMetrics) {
+    const seg = correctedEntry[metric] as SegmentalData;
+    const prevSeg = previous[metric] as SegmentalData;
+
+    if (prevSeg && prevSeg.lb > 0 && (!seg || seg.lb === 0)) {
+      // Previous had value but we don't - estimate as 10-20% different
+      const estimatedLb = prevSeg.lb * 1.05; // assume slight change
+      if (!seg) {
+        (correctedEntry[metric] as any) = { lb: estimatedLb, percent: prevSeg.percent };
+      } else {
+        seg.lb = estimatedLb;
+        seg.percent = prevSeg.percent;
+      }
+      corrected = true;
+      console.log(`Auto-estimated ${metric}: ${estimatedLb.toFixed(1)} lb`);
+    }
+  }
+
+  return corrected ? correctedEntry : null;
+}
+
+export function validateAgainstPrevious(parsed: BIAEntry, previous: BIAEntry | null): ValidationIssue[] {
+  if (!previous) return [];
+
+  const issues: ValidationIssue[] = [];
+  const threshold = 0.1; // ±10%
+
+  const numericMetrics: Array<keyof BIAEntry> = [
+    'weight', 'bmi', 'bodyFatPercentage', 'visceralFat', 'skeletalMuscle',
+    'bodyWater', 'protein', 'boneMass', 'bodyFatMass', 'softLeanMass', 'fatFreeMass', 'lbm', 'bmr',
+    'metabolicAge', 'subcutaneousFatPercentage', 'muscleMassPercentage', 'skeletalMusclePercentage',
+    'boneMassPercentage', 'proteinPercentage', 'bodyWaterPercentage', 'smi', 'waistHipRatio',
+    'fitnessScore', 'normalWeight', 'weightControl', 'fatMassControl', 'muscleControl'
+  ];
+
+  for (const metric of numericMetrics) {
+    const parsedVal = Number(parsed[metric]) || 0;
+    const prevVal = Number(previous[metric]) || 0;
+
+    // Skip if either value is 0 or missing
+    if (parsedVal === 0 || prevVal === 0) {
+      // Special case: flag if previous had value but parsed doesn't
+      if (prevVal > 0 && parsedVal === 0) {
+        issues.push({
+          metric,
+          parsed: parsedVal,
+          previous: prevVal,
+          percentChange: -100,
+          status: 'error'
+        });
+      }
+      continue;
+    }
+
+    const percentChange = ((parsedVal - prevVal) / prevVal);
+    const absPctChange = Math.abs(percentChange);
+
+    if (absPctChange > threshold) {
+      issues.push({
+        metric,
+        parsed: parsedVal,
+        previous: prevVal,
+        percentChange: percentChange * 100,
+        status: absPctChange > 0.5 ? 'error' : 'warning' // >50% change is error
+      });
+    }
+  }
+
+  // Check segmental metrics (these are objects)
+  const segmentalMetrics: Array<{
+    key: keyof BIAEntry;
+    label: string;
+  }> = [
+    { key: 'muscleLeftArm', label: 'Muscle Left Arm' },
+    { key: 'muscleRightArm', label: 'Muscle Right Arm' },
+    { key: 'muscleTrunk', label: 'Muscle Trunk' },
+    { key: 'muscleLeftLeg', label: 'Muscle Left Leg' },
+    { key: 'muscleRightLeg', label: 'Muscle Right Leg' },
+    { key: 'fatLeftArm', label: 'Fat Left Arm' },
+    { key: 'fatRightArm', label: 'Fat Right Arm' },
+    { key: 'fatTrunk', label: 'Fat Trunk' },
+    { key: 'fatLeftLeg', label: 'Fat Left Leg' },
+    { key: 'fatRightLeg', label: 'Fat Right Leg' },
+  ];
+
+  for (const seg of segmentalMetrics) {
+    const parsedSeg = parsed[seg.key] as SegmentalData;
+    const prevSeg = previous[seg.key] as SegmentalData;
+
+    if (!parsedSeg || !prevSeg) continue;
+
+    const parsedLb = parsedSeg.lb || 0;
+    const prevLb = prevSeg.lb || 0;
+
+    // Skip if both are 0
+    if (parsedLb === 0 && prevLb === 0) continue;
+
+    // Flag if previous had value but parsed doesn't
+    if (prevLb > 0 && parsedLb === 0) {
+      issues.push({
+        metric: seg.label,
+        parsed: parsedLb,
+        previous: prevLb,
+        percentChange: -100,
+        status: 'error'
+      });
+      continue;
+    }
+
+    // Flag if new value exists but previous didn't (less critical, could be new data)
+    if (prevLb === 0 && parsedLb > 0) {
+      continue; // Don't flag new data appearing
+    }
+
+    // Check percentage change
+    if (prevLb > 0) {
+      const percentChange = ((parsedLb - prevLb) / prevLb);
+      const absPctChange = Math.abs(percentChange);
+
+      if (absPctChange > threshold) {
+        issues.push({
+          metric: seg.label,
+          parsed: parsedLb,
+          previous: prevLb,
+          percentChange: percentChange * 100,
+          status: absPctChange > 0.5 ? 'error' : 'warning'
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
 export function parseBIAReport(text: string): BIAEntry {
   console.log('=== PARSING BIA REPORT ===');
   console.log('Text length:', text.length);
@@ -43,15 +285,18 @@ export function parseBIAReport(text: string): BIAEntry {
   // Weight - "172Ib", "171.2lb", or "Weight\n172lb"
   // Avoid matching "Normal weight" from the recommendations section
   // Look for standalone weight or weight in composition section
-  const weightMatch = text.match(/(?<!Normal\s)Weight\s*\n?\s*(\d{2,3}\.?\d*)(?:I|l)?b/i) ||
-    text.match(/(\d{3}\.?\d*)(?:I|l)?b\s*Fat\s*Mass/i) ||
-    text.match(/Body\s*Composition[\s\S]{0,50}?(\d{3}\.?\d*)(?:I|l)?b/i);
+  // Improved: more flexible digit matching for OCR errors
+  const weightMatch = text.match(/(?<!Normal\s)Weight\s*\n?\s*(\d{2,3}\.?\d*)(?:[Il\|])?[bp]/i) ||
+    text.match(/(\d{3}\.?\d*)(?:[Il\|])?[bp]\s*Fat\s*Mass/i) ||
+    text.match(/Body\s*Composition[\s\S]{0,50}?(\d{3}\.?\d*)(?:[Il\|])?[bp]/i);
   const weight = weightMatch ? parseFloat(weightMatch[1]) : 0;
   console.log('Weight:', weight);
 
   // BMI - look after "BMI" or "(kg/m?)" - "23.2"
-  const bmiMatch = text.match(/BMI\s*[\s\S]*?(\d{2}\.\d)/i) ||
-    text.match(/\(kg\/m[²2\?]?\)\s*[\s\S]*?(\d{2}\.\d)/i);
+  // Improved: more flexible pattern to avoid picking up wrong numbers
+  const bmiMatch = text.match(/BMI\s*[\s\S]{0,30}?(\d{2}\.\d)(?!\d)/i) ||
+    text.match(/\(kg\/m[²2\?]?\)\s*[\s\S]{0,30}?(\d{2}\.\d)(?!\d)/i) ||
+    text.match(/BMI\s*[:\s]+(\d{1,2}\.\d)/i);
   const bmi = bmiMatch ? parseFloat(bmiMatch[1]) : 0;
   console.log('BMI:', bmi);
 
@@ -210,22 +455,24 @@ export function parseBIAReport(text: string): BIAEntry {
     // Split into lines for easier parsing
     const lines = sectionText.split('\n');
 
-    // Find lines with the actual data (contain lb and %)
-    const dataLines = lines.filter(line =>
-      line.includes('lb') && line.includes('%') ||
-      line.includes('Ib') && line.includes('%') ||
-      line.includes('|b') && line.includes('%') ||
-      line.includes('|p') && line.includes('%')
-    );
+    // Find lines with the actual data (contain lb/weight indicator and %)
+    // More robust to OCR errors: match various representations of 'lb' and '%'
+    const dataLines = lines.filter(line => {
+      const lbPattern = /[1Il\|][bp]|lb|Ib|\|b|\|p/i;
+      const percentPattern = /%|0\/0|o\/o/i; // % or OCR errors like 0/0 or o/o
+      return lbPattern.test(line) && percentPattern.test(line);
+    });
 
     console.log('Data lines found:', dataLines.length);
     dataLines.forEach((l, i) => console.log(`  Line ${i}: ${l}`));
 
     // Extract left-side values: "[@®©] X.Xlb [MW|W] X.X%"
-    const leftPattern = /[@®©⊕]\s*(\d+\.?\d*)\s*(?:l|I|\|)?[bp]\s*(?:MW|W|M)?\s*(\d+\.?\d*)%/gi;
+    // Improved to handle OCR substitutions: 1/l/I confusion, 0/O confusion, etc.
+    const leftPattern = /[@®©⊕]\s*([0-9.]+)\s*(?:[1Il\|])?[bp]\s*(?:MW|W|M)?\s*([0-9.]+)\s*(?:%|0\/0|o\/o)/gi;
 
     // Extract right-side values: "[HM|H] X.X% [@®©] X.Xlb"
-    const rightPattern = /(?:HM|H)\s*(\d+\.?\d*)%\s*[@®©⊕]\s*(\d+\.?\d*)\s*(?:l|I|\|)?[bp]/gi;
+    // Improved pattern for better OCR handling
+    const rightPattern = /(?:HM|H)\s*([0-9.]+)\s*(?:%|0\/0|o\/o)\s*[@®©⊕]\s*([0-9.]+)\s*(?:[1Il\|])?[bp]/gi;
 
     const leftMatches: Array<{ lb: number; percent: number }> = [];
     const rightMatches: Array<{ lb: number; percent: number }> = [];

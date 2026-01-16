@@ -1,11 +1,12 @@
 'use client';
 
 import { useCalendar } from './calendar-context';
+import { EventForm } from './event-form';
 import { createClient } from '@/lib/supabase/client';
 import { useState, useEffect, useRef } from 'react';
 import { format, parseISO } from 'date-fns';
-import { CALENDAR_CATEGORIES } from '@/lib/calendar-config';
 import { CalendarCategoryKey } from '@/types/calendar';
+import { CALENDAR_CATEGORIES } from '@/lib/calendar-config';
 import { cn } from '@/lib/utils';
 import { X, Trash2 } from 'lucide-react';
 
@@ -215,114 +216,52 @@ export function EventModal() {
                     </button>
                 </div>
 
-                <div className="space-y-5">
-                    {/* Title */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
-                            {isEditMode ? 'Event Title' : 'What made today great?'}
-                        </label>
-                        <input
-                            type="text"
-                            value={title}
-                            onChange={e => setTitle(e.target.value)}
-                            placeholder={isEditMode ? 'Event title' : 'e.g. Shipped the MVP'}
-                            className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-gray-400 dark:focus:border-gray-600 focus:ring-1 focus:ring-gray-200 dark:focus:ring-gray-700"
-                            autoFocus
-                            disabled={isSaving || isDeleting}
-                        />
-                    </div>
+                <EventForm
+                    title={title}
+                    setTitle={setTitle}
+                    startDate={startDate}
+                    setStartDate={setStartDate}
+                    endDate={endDate}
+                    setEndDate={setEndDate}
+                    category={category}
+                    setCategory={setCategory}
+                    isEditMode={isEditMode}
+                    disabled={isSaving || isDeleting}
+                />
 
-                    {/* Date Inputs - Only show in edit mode */}
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-3">
+                    <button
+                        onClick={handleSave}
+                        disabled={isSaving || isDeleting || !title.trim()}
+                        className="flex-1 bg-gray-800 dark:bg-gray-700 text-white font-medium py-2.5 rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isSaving ? 'Saving...' : isEditMode ? 'Update Event' : 'Save Event'}
+                        <span className="text-xs font-normal text-gray-300 ml-1">(⌘⏎)</span>
+                    </button>
+
                     {isEditMode && (
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-                                    Start Date
-                                </label>
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={e => setStartDate(e.target.value)}
-                                    className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-gray-400 dark:focus:border-gray-600 focus:ring-1 focus:ring-gray-200 dark:focus:ring-gray-700"
-                                    disabled={isSaving || isDeleting}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-                                    End Date
-                                </label>
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={e => setEndDate(e.target.value)}
-                                    className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-gray-400 dark:focus:border-gray-600 focus:ring-1 focus:ring-gray-200 dark:focus:ring-gray-700"
-                                    disabled={isSaving || isDeleting}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Category */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">Category</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {Object.values(CALENDAR_CATEGORIES).map((cat, idx) => (
-                                <button
-                                    key={cat.key}
-                                    onClick={() => setCategory(cat.key)}
-                                    disabled={isSaving || isDeleting}
-                                    title={`Press ⌘${idx + 1} to select`}
-                                    className={cn(
-                                        "flex items-center justify-between px-3 py-2 rounded-md text-sm transition-all border",
-                                        category === cat.key
-                                            ? cn(cat.color, cat.borderColor, "border") // Explicit border color from config
-                                            : "bg-white dark:bg-zinc-900 border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-50"
-                                    )}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <div className={cn("w-2.5 h-2.5 rounded-full", cat.dotColor)} />
-                                        <span className={cn("font-medium", category === cat.key ? cat.textColor : "")}>{cat.label}</span>
-                                    </div>
-                                    <span className={cn("text-xs font-normal", category === cat.key ? cat.textColor : "text-gray-500 dark:text-gray-600")}>{idx + 1}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-2 pt-3">
                         <button
-                            onClick={handleSave}
-                            disabled={isSaving || isDeleting || !title.trim()}
-                            className="flex-1 bg-gray-800 dark:bg-gray-700 text-white font-medium py-2.5 rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            onClick={handleDelete}
+                            disabled={isSaving || isDeleting}
+                            className={cn(
+                                "px-3 py-2.5 rounded-md font-medium transition-all flex items-center gap-2",
+                                deleteConfirm
+                                    ? "bg-red-500/90 text-white hover:bg-red-600"
+                                    : "bg-gray-700 dark:bg-gray-800 text-gray-300 dark:text-gray-400 hover:bg-gray-600 dark:hover:bg-gray-700 disabled:opacity-50"
+                            )}
                         >
-                            {isSaving ? 'Saving...' : isEditMode ? 'Update Event' : 'Save Event'}
-                            <span className="text-xs font-normal text-gray-300 ml-1">(⌘⏎)</span>
+                            <Trash2 size={16} />
+                            {deleteConfirm ? 'Confirm' : 'Delete'}
                         </button>
-
-                        {isEditMode && (
-                            <button
-                                onClick={handleDelete}
-                                disabled={isSaving || isDeleting}
-                                className={cn(
-                                    "px-3 py-2.5 rounded-md font-medium transition-all flex items-center gap-2",
-                                    deleteConfirm
-                                        ? "bg-red-500/90 text-white hover:bg-red-600"
-                                        : "bg-gray-700 dark:bg-gray-800 text-gray-300 dark:text-gray-400 hover:bg-gray-600 dark:hover:bg-gray-700 disabled:opacity-50"
-                                )}
-                            >
-                                <Trash2 size={16} />
-                                {deleteConfirm ? 'Confirm' : 'Delete'}
-                            </button>
-                        )}
-                    </div>
-
-                    {deleteConfirm && isEditMode && (
-                        <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 px-3 py-2 rounded-md">
-                            Click Delete again to confirm removal
-                        </p>
                     )}
                 </div>
+
+                {deleteConfirm && isEditMode && (
+                    <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 px-3 py-2 rounded-md">
+                        Click Delete again to confirm removal
+                    </p>
+                )}
             </div>
         </div>
     );

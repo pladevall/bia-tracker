@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
-import { CALENDAR_CATEGORIES } from '@/lib/calendar-config';
 import { CalendarCategoryKey } from '@/types/calendar';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
 import { useCalendar } from './calendar-context';
+import { EventForm } from './event-form';
+import { CALENDAR_CATEGORIES } from '@/lib/calendar-config';
 
 interface BatchInputModeProps {
     isOpen: boolean;
@@ -158,93 +159,35 @@ export function BatchInputMode({ isOpen, onClose, onEventCreated }: BatchInputMo
                 )}
 
                 {/* Input form */}
-                <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">
                         New Event {events.length > 0 && `(${events.length + 1})`}
                     </h3>
 
-                    {/* Title input */}
-                    <input
-                        type="text"
-                        value={currentEvent.title}
-                        onChange={(e) => setCurrentEvent({ ...currentEvent, title: e.target.value })}
-                        placeholder="Event title"
-                        className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-gray-400 dark:focus:border-gray-600"
-                        onKeyPress={(e) => e.key === 'Enter' && handleAddEvent()}
+                    <EventForm
+                        title={currentEvent.title}
+                        setTitle={(title) => setCurrentEvent({ ...currentEvent, title })}
+                        startDate={currentEvent.startDate}
+                        setStartDate={(startDate) => setCurrentEvent({ ...currentEvent, startDate })}
+                        endDate={currentEvent.endDate}
+                        setEndDate={(endDate) => setCurrentEvent({ ...currentEvent, endDate })}
+                        category={currentEvent.category}
+                        setCategory={(category) => setCurrentEvent({ ...currentEvent, category })}
+                        disabled={isSaving}
                     />
 
-                    {/* Date range */}
-                    <div className="grid grid-cols-2 gap-2">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                                Start Date
-                            </label>
-                            <input
-                                type="date"
-                                value={currentEvent.startDate}
-                                onChange={(e) =>
-                                    setCurrentEvent({
-                                        ...currentEvent,
-                                        startDate: e.target.value,
-                                    })
-                                }
-                                className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-gray-400 dark:focus:border-gray-600"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                                End Date
-                            </label>
-                            <input
-                                type="date"
-                                value={currentEvent.endDate}
-                                onChange={(e) =>
-                                    setCurrentEvent({
-                                        ...currentEvent,
-                                        endDate: e.target.value,
-                                    })
-                                }
-                                className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-gray-400 dark:focus:border-gray-600"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Category selector */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                            Category
-                        </label>
-                        <div className="grid grid-cols-2 gap-1">
-                            {Object.values(CALENDAR_CATEGORIES).map((cat) => (
-                                <button
-                                    key={cat.key}
-                                    onClick={() => setCurrentEvent({ ...currentEvent, category: cat.key })}
-                                    className={cn(
-                                        "text-xs px-2 py-1.5 rounded border transition-all",
-                                        currentEvent.category === cat.key
-                                            ? cn(cat.color, cat.borderColor)
-                                            : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700"
-                                    )}
-                                >
-                                    <div className={cn("w-1.5 h-1.5 rounded-full inline-block mr-1", cat.dotColor)} />
-                                    {cat.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
                     {/* Action buttons */}
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 pt-5">
                         <button
                             onClick={handleAddEvent}
                             disabled={!currentEvent.title.trim() || isSaving}
-                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded disabled:opacity-50 transition-colors"
+                            className="flex-1 bg-gray-800 dark:bg-gray-700 text-white font-medium py-2.5 rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
                         >
                             {isSaving ? 'Adding...' : `Add Event (⏎)`}
                         </button>
                         <button
                             onClick={handleClose}
-                            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white font-medium rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                            className="px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                         >
                             Done (Esc)
                         </button>

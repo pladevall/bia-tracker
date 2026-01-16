@@ -134,7 +134,16 @@ export function SleepTable({ entries }: SleepTableProps) {
                         label={
                             <div className="flex items-center gap-1">
                                 Sleep Score
-                                <Tooltip content="Overall sleep quality score based on Duration, Bedtime, and Interruptions.">
+                                <Tooltip content={
+                                    <div className="space-y-2">
+                                        <p>Overall sleep quality score (0-100) based on three key components:</p>
+                                        <ul className="list-disc pl-4 space-y-1">
+                                            <li><span className="font-medium text-emerald-500">Duration (50 pts):</span> Total time asleep vs target.</li>
+                                            <li><span className="font-medium text-emerald-500">Bedtime (30 pts):</span> Consistency with target bedtime.</li>
+                                            <li><span className="font-medium text-emerald-500">Interruptions (20 pts):</span> Number and duration of wake-ups.</li>
+                                        </ul>
+                                    </div>
+                                }>
                                     <svg className="w-3 h-3 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
@@ -152,13 +161,13 @@ export function SleepTable({ entries }: SleepTableProps) {
                                     {/* Breakdown */}
                                     <div className="flex gap-1 text-[9px] text-gray-400">
                                         <Tooltip content={`Duration: ${entry.durationScore}/50`}>
-                                            <span className="px-1 bg-gray-100 dark:bg-gray-800 rounded">D:{entry.durationScore}</span>
+                                            <span className="px-1 bg-gray-100/50 dark:bg-gray-800/50 rounded tabular-nums">{entry.durationScore}/50</span>
                                         </Tooltip>
                                         <Tooltip content={`Bedtime: ${entry.bedtimeScore}/30`}>
-                                            <span className="px-1 bg-gray-100 dark:bg-gray-800 rounded">B:{entry.bedtimeScore}</span>
+                                            <span className="px-1 bg-gray-100/50 dark:bg-gray-800/50 rounded tabular-nums">{entry.bedtimeScore}/30</span>
                                         </Tooltip>
                                         <Tooltip content={`Interruptions: ${entry.interruptionScore}/20`}>
-                                            <span className="px-1 bg-gray-100 dark:bg-gray-800 rounded">I:{entry.interruptionScore}</span>
+                                            <span className="px-1 bg-gray-100/50 dark:bg-gray-800/50 rounded tabular-nums">{entry.interruptionScore}/20</span>
                                         </Tooltip>
                                     </div>
                                 </div>
@@ -226,7 +235,16 @@ export function SleepTable({ entries }: SleepTableProps) {
                         )}
                     />
                     <TimeSeriesRow
-                        label="Wake Up"
+                        label={
+                            <div className="flex items-center gap-1">
+                                Wake Up
+                                <Tooltip content="Time you woke up.">
+                                    <svg className="w-3 h-3 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </Tooltip>
+                            </div>
+                        }
                         fixedContent={
                             <td className="px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-800/20">
                                 <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
@@ -242,7 +260,16 @@ export function SleepTable({ entries }: SleepTableProps) {
                         )}
                     />
                     <TimeSeriesRow
-                        label="Time in Bed"
+                        label={
+                            <div className="flex items-center gap-1">
+                                Time in Bed
+                                <Tooltip content="Total time spent in bed, including time to fall asleep and time awake after waking.">
+                                    <svg className="w-3 h-3 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </Tooltip>
+                            </div>
+                        }
                         fixedContent={renderTrendCell(latestEntry?.data.stages.inBedMinutes, comparisonEntry?.data.stages.inBedMinutes, false)}
                         columns={sortedEntries}
                         renderCell={(entry) => (
@@ -268,7 +295,16 @@ export function SleepTable({ entries }: SleepTableProps) {
             {expandedSections.has('stages') && (
                 <>
                     <TimeSeriesRow
-                        label="Deep Sleep"
+                        label={
+                            <div className="flex items-center gap-1">
+                                Deep Sleep
+                                <Tooltip content="Physical recovery stage. Essential for muscle growth and repair.">
+                                    <svg className="w-3 h-3 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </Tooltip>
+                            </div>
+                        }
                         fixedContent={renderTrendCell(latestEntry?.data.stages.deepMinutes, comparisonEntry?.data.stages.deepMinutes, true)}
                         columns={sortedEntries}
                         renderCell={(entry) => (
@@ -304,7 +340,16 @@ export function SleepTable({ entries }: SleepTableProps) {
                         )}
                     />
                     <TimeSeriesRow
-                        label="Awake"
+                        label={
+                            <div className="flex items-center gap-1">
+                                Awake
+                                <Tooltip content="Time spent awake during the sleep period.">
+                                    <svg className="w-3 h-3 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </Tooltip>
+                            </div>
+                        }
                         fixedContent={renderTrendCell(latestEntry?.data.stages.awakeMinutes, comparisonEntry?.data.stages.awakeMinutes, false)}
                         columns={sortedEntries}
                         renderCell={(entry) => (
@@ -333,19 +378,19 @@ export function SleepTable({ entries }: SleepTableProps) {
                         label={
                             <div className="flex items-center gap-1">
                                 Wake Ups
-                                <Tooltip content="Number of times you woke up. Target: 0-1 (20 pts).">
+                                <Tooltip content="The number of times you were awake or restless during the night.">
                                     <svg className="w-3 h-3 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                 </Tooltip>
                             </div>
                         }
-                        fixedContent={renderTrendCell(latestEntry?.data.interruptions.count, comparisonEntry?.data.interruptions.count, false)}
+                        fixedContent={renderTrendCell(latestEntry?.data.interruptions.wakeUpsCount ?? latestEntry?.data.interruptions.count, comparisonEntry?.data.interruptions.wakeUpsCount ?? comparisonEntry?.data.interruptions.count, false)}
                         columns={sortedEntries}
                         renderCell={(entry) => (
                             <td key={entry.id} className="px-3 py-2 text-center border-l border-gray-100 dark:border-gray-800/50">
                                 <span className="text-xs tabular-nums font-medium text-gray-700 dark:text-gray-300">
-                                    {entry.data.interruptions.count}
+                                    {entry.data.interruptions.wakeUpsCount ?? entry.data.interruptions.count}
                                 </span>
                             </td>
                         )}
@@ -353,20 +398,20 @@ export function SleepTable({ entries }: SleepTableProps) {
                     <TimeSeriesRow
                         label={
                             <div className="flex items-center gap-1">
-                                Duration
-                                <Tooltip content="Total time spent awake during interruptions.">
+                                Interruption Time
+                                <Tooltip content="Total duration of all wake-ups and restless periods.">
                                     <svg className="w-3 h-3 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                 </Tooltip>
                             </div>
                         }
-                        fixedContent={renderTrendCell(latestEntry?.data.interruptions.totalMinutes, comparisonEntry?.data.interruptions.totalMinutes, false)}
+                        fixedContent={renderTrendCell(latestEntry?.data.interruptions.interruptionsDurationMinutes ?? latestEntry?.data.interruptions.totalMinutes, comparisonEntry?.data.interruptions.interruptionsDurationMinutes ?? comparisonEntry?.data.interruptions.totalMinutes, false)}
                         columns={sortedEntries}
                         renderCell={(entry) => (
                             <td key={entry.id} className="px-3 py-2 text-center border-l border-gray-100 dark:border-gray-800/50">
                                 <span className="text-xs tabular-nums font-medium text-gray-700 dark:text-gray-300">
-                                    {formatDuration(entry.data.interruptions.totalMinutes)}
+                                    {formatDuration(entry.data.interruptions.interruptionsDurationMinutes ?? entry.data.interruptions.totalMinutes)}
                                 </span>
                             </td>
                         )}

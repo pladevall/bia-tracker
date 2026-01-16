@@ -6,8 +6,10 @@ import DataTable from '@/components/DataTable';
 import IntegrationTabs from '@/components/IntegrationTabs';
 import WorkoutTable from '@/components/WorkoutTable';
 import { SleepTable } from '@/components/SleepTable';
+import ValidationWarning from '@/components/ValidationWarning';
 import { BIAEntry, BodyspecScan, RunningActivity, LiftingWorkout, SleepEntry } from '@/lib/types';
 import { parsePDFFile } from '@/lib/client-pdf-parser';
+import { ValidationIssue } from '@/lib/pdf-parser';
 import ThemeToggle from '@/components/ThemeToggle';
 import { getEntriesFromDb, saveEntryToDb, deleteEntryFromDb, migrateFromLocalStorage, getPendingImages, deletePendingImage, saveOcrDebug, getGoals, saveGoal, deleteGoal, Goal } from '@/lib/supabase';
 
@@ -42,6 +44,17 @@ export default function Home() {
   const [progress, setProgress] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+
+  // Validation state
+  const [validationState, setValidationState] = useState<{
+    issues: ValidationIssue[];
+    entry: BIAEntry;
+    rawText: string;
+    fileIndex: number;
+    totalFiles: number;
+  } | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
 
   const toggleScanVisibility = useCallback((scanId: string) => {
     setHiddenScans(prev => {
@@ -264,54 +277,115 @@ export default function Home() {
     init();
   }, [loadBodyspecData, loadWorkoutData, loadSleepData]);
 
+  const processNextFile = useCallback(
+    async (filesToProcess: File[], startIndex: number, skipped: Set<number>, failed: number) => {
+      if (startIndex >= filesToProcess.length) {
+        // Done processing all files
+        const cloudEntries = await getEntriesFromDb();
+        setEntries(cloudEntries);
+        setProgress('');
+        setIsLoading(false);
+        setValidationState(null);
+        setPendingFiles([]);
+
+        const processed = filesToProcess.length - failed;
+        if (failed > 0) {
+          setError(`Processed ${processed}/${filesToProcess.length} images. ${failed} skipped or failed to parse.`);
+        }
+        return;
+      }
+
+      const file = filesToProcess[startIndex];
+      const processed = startIndex + 1;
+      const total = filesToProcess.length;
+
+      setProgress(`Processing ${processed}/${total}...`);
+      setCurrentFileIndex(startIndex);
+
+      try {
+        const previousEntry = entries.length > 0 ? entries[0] : undefined;
+        const { entry, validationIssues, rawText } = await parsePDFFile(file, (msg) => {
+          setProgress(`(${processed}/${total}) ${msg}`);
+        }, previousEntry);
+
+        const hasData = entry.weight > 0 || entry.bodyFatPercentage > 0 || entry.fitnessScore > 0;
+
+        if (!hasData) {
+          await processNextFile(filesToProcess, startIndex + 1, skipped, failed + 1);
+          return;
+        }
+
+        // If validation issues found, show warning
+        if (validationIssues && validationIssues.length > 0) {
+          setValidationState({
+            issues: validationIssues,
+            entry,
+            rawText,
+            fileIndex: startIndex,
+            totalFiles: total,
+          });
+          return; // Wait for user response
+        }
+
+        // No issues, save directly
+        setProgress(`(${processed}/${total}) Saving to cloud...`);
+        await saveEntryToDb(entry);
+        await processNextFile(filesToProcess, startIndex + 1, skipped, failed);
+      } catch (err) {
+        console.error('Error processing file:', err);
+        await processNextFile(filesToProcess, startIndex + 1, skipped, failed + 1);
+      }
+    },
+    [entries]
+  );
+
+  const handleValidationConfirm = useCallback(async () => {
+    if (!validationState) return;
+
+    try {
+      setProgress(
+        `(${validationState.fileIndex + 1}/${validationState.totalFiles}) Saving to cloud...`
+      );
+      await saveEntryToDb(validationState.entry);
+
+      // Process next file
+      await processNextFile(
+        pendingFiles,
+        validationState.fileIndex + 1,
+        new Set(),
+        0
+      );
+    } catch (err) {
+      console.error('Error saving entry:', err);
+      setError('Failed to save entry');
+    }
+  }, [validationState, pendingFiles, processNextFile]);
+
+  const handleValidationSkip = useCallback(async () => {
+    if (!validationState) return;
+
+    // Skip this file and process next
+    await processNextFile(
+      pendingFiles,
+      validationState.fileIndex + 1,
+      new Set(),
+      1
+    );
+  }, [validationState, pendingFiles, processNextFile]);
+
+  const handleValidationReview = useCallback(() => {
+    if (!validationState) return;
+    alert('Raw OCR Text:\n\n' + validationState.rawText);
+  }, [validationState]);
+
   const handleUpload = useCallback(async (files: File[]) => {
     setIsLoading(true);
     setError(null);
+    setPendingFiles(files);
+    setCurrentFileIndex(0);
 
-    const total = files.length;
-    let processed = 0;
-    let failed = 0;
-
-    try {
-      for (const file of files) {
-        processed++;
-        setProgress(`Processing ${processed}/${total}...`);
-
-        try {
-          const { entry } = await parsePDFFile(file, (msg) => {
-            setProgress(`(${processed}/${total}) ${msg}`);
-          });
-
-          const hasData = entry.weight > 0 || entry.bodyFatPercentage > 0 || entry.fitnessScore > 0;
-
-          if (!hasData) {
-            failed++;
-            continue;
-          }
-
-          setProgress(`(${processed}/${total}) Saving to cloud...`);
-          await saveEntryToDb(entry);
-        } catch (err) {
-          console.error('Error processing file:', err);
-          failed++;
-        }
-      }
-
-      // Refresh entries from cloud
-      const cloudEntries = await getEntriesFromDb();
-      setEntries(cloudEntries);
-      setProgress('');
-
-      if (failed > 0) {
-        setError(`Processed ${total - failed}/${total} images. ${failed} failed to parse.`);
-      }
-    } catch (err) {
-      console.error('Upload error:', err);
-      setError('Failed to process images: ' + (err instanceof Error ? err.message : 'Unknown error'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    await processNextFile(files, 0, new Set(), 0);
+  }, [processNextFile]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (confirm('Delete this entry?')) {
@@ -468,6 +542,17 @@ export default function Home() {
           liftingWorkouts={liftingWorkouts}
           onWorkoutSync={loadWorkoutData}
         />
+
+        {/* Validation Warning Modal */}
+        {validationState && (
+          <ValidationWarning
+            issues={validationState.issues}
+            entry={validationState.entry}
+            onConfirm={handleValidationConfirm}
+            onReview={handleValidationReview}
+            onSkip={handleValidationSkip}
+          />
+        )}
       </div>
     </div>
   );

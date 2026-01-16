@@ -85,7 +85,6 @@ const MUSCLE_GROUP_TO_BODY_PART: Record<string, string> = {
 
     // Other
     'other': 'other',
-    'cardio': 'cardio',
 };
 
 /**
