@@ -3,7 +3,7 @@
 import { useCalendar } from './calendar-context';
 import { createClient } from '@/lib/supabase/client';
 import { useState, useEffect, useRef } from 'react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { CALENDAR_CATEGORIES } from '@/lib/calendar-config';
 import { CalendarCategoryKey } from '@/types/calendar';
 import { cn } from '@/lib/utils';
@@ -203,8 +203,8 @@ export function EventModal() {
             <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg w-full max-w-md shadow-xl transition-colors">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-sm font-medium text-gray-600 dark:text-gray-400 tracking-wide">
-                        {format(new Date(startDate), 'MMM d, yyyy')}
-                        {startDate !== endDate && ` – ${format(new Date(endDate), 'MMM d, yyyy')}`}
+                        {format(parseISO(startDate), 'MMM d, yyyy')}
+                        {startDate !== endDate && ` – ${format(parseISO(endDate), 'MMM d, yyyy')}`}
                     </h2>
                     <button
                         onClick={closeModal}
