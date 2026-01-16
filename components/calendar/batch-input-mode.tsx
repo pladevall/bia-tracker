@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
 import { CalendarCategoryKey } from '@/types/calendar';
@@ -34,24 +34,7 @@ export function BatchInputMode({ isOpen, onClose, onEventCreated }: BatchInputMo
     });
     const [isSaving, setIsSaving] = useState(false);
 
-    // Keyboard shortcut to toggle batch mode
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'b') {
-                e.preventDefault();
-                if (!isOpen) {
-                    // Open batch mode
-                } else {
-                    onClose();
-                }
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, onClose]);
-
-    const handleAddEvent = async () => {
+    const handleAddEvent = useCallback(async () => {
         if (!currentEvent.title.trim()) return;
 
         setIsSaving(true);
@@ -69,7 +52,7 @@ export function BatchInputMode({ isOpen, onClose, onEventCreated }: BatchInputMo
 
             if (!error) {
                 // Add to local list and reset form
-                setEvents([...events, currentEvent]);
+                setEvents(prev => [...prev, currentEvent]);
                 setCurrentEvent({
                     title: '',
                     category: 'deep_work',
@@ -82,13 +65,13 @@ export function BatchInputMode({ isOpen, onClose, onEventCreated }: BatchInputMo
         } finally {
             setIsSaving(false);
         }
-    };
+    }, [currentEvent, events, refreshEvents, onEventCreated]);
 
     const handleRemoveEvent = (index: number) => {
         setEvents(events.filter((_, i) => i !== index));
     };
 
-    const handleClose = async () => {
+    const handleClose = useCallback(async () => {
         await refreshEvents();
         setEvents([]);
         setCurrentEvent({
@@ -98,7 +81,52 @@ export function BatchInputMode({ isOpen, onClose, onEventCreated }: BatchInputMo
             endDate: format(new Date(), 'yyyy-MM-dd'),
         });
         onClose();
-    };
+    }, [refreshEvents, onClose]);
+
+    // Keyboard shortcuts for batch mode
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleKeyDown = async (e: KeyboardEvent) => {
+            // Escape to close
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                await handleClose();
+                return;
+            }
+
+            // Enter to add event
+            if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
+                if (currentEvent.title.trim()) {
+                    e.preventDefault();
+                    await handleAddEvent();
+                }
+                return;
+            }
+
+            // Cmd/Ctrl + Enter to add event
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                if (currentEvent.title.trim()) {
+                    e.preventDefault();
+                    await handleAddEvent();
+                }
+                return;
+            }
+
+            // Number keys 1-6 to select category
+            if (e.key >= '1' && e.key <= '6') {
+                e.preventDefault();
+                const categories = Object.keys(CALENDAR_CATEGORIES) as CalendarCategoryKey[];
+                const index = parseInt(e.key) - 1;
+                if (index < categories.length) {
+                    setCurrentEvent({ ...currentEvent, category: categories[index] });
+                }
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, currentEvent, handleAddEvent, handleClose]);
 
     if (!isOpen) return null;
 
