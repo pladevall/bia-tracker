@@ -3,7 +3,7 @@
 // KEEP CONSISTENT: Use 'text-gray-300 dark:text-gray-600' for all empty state dashes to ensure subtle but visible styling.
 import { useState } from 'react';
 // KEEP CONSISTENT: Use 'text-gray-300 dark:text-gray-600' for all empty state dashes to ensure subtle but visible styling.
-import { BIAEntry, BodyspecScan, BodyspecScanData, METRIC_DEFINITIONS, CATEGORY_LABELS, MetricDefinition, GOAL_ELIGIBLE_METRICS } from '@/lib/types';
+import { BIAEntry, BodyspecScan, BodyspecScanData, METRIC_DEFINITIONS, CATEGORY_LABELS, MetricDefinition, GOAL_ELIGIBLE_METRICS, CorrelationResult, Insight } from '@/lib/types';
 // KEEP CONSISTENT: Use 'text-gray-300 dark:text-gray-600' for all empty state dashes to ensure subtle but visible styling.
 import { Goal } from '@/lib/supabase';
 // KEEP CONSISTENT: Use 'text-gray-300 dark:text-gray-600' for all empty state dashes to ensure subtle but visible styling.
@@ -17,6 +17,8 @@ interface DataTableProps {
   entries: BIAEntry[];
   goals: Goal[];
   bodyspecScans?: BodyspecScan[];
+  correlations?: CorrelationResult[];
+  insights?: Insight[];
   onDelete: (id: string) => void;
   onSaveGoal: (metricKey: string, targetValue: number) => void;
   onDeleteGoal: (metricKey: string) => void;
@@ -433,9 +435,12 @@ function getDexaSegmentalValue(scan: BodyspecScan, metricKey: string): number | 
   return mapping.type === 'lean' ? regionData.lean : regionData.fat;
 }
 
-export default function DataTable({ entries, goals, bodyspecScans = [], onDelete, onSaveGoal, onDeleteGoal }: DataTableProps) {
+export default function DataTable({ entries, goals, bodyspecScans = [], correlations = [], insights = [], onDelete, onSaveGoal, onDeleteGoal }: DataTableProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(['header', 'core', 'segmental-muscle', 'segmental-fat'])
+  );
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set()
   );
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('30');
   const [editingGoal, setEditingGoal] = useState<{ metricKey: string; label: string } | null>(null);
@@ -448,6 +453,16 @@ export default function DataTable({ entries, goals, bodyspecScans = [], onDelete
       newExpanded.add(category);
     }
     setExpandedCategories(newExpanded);
+  };
+
+  const toggleSection = (section: string) => {
+    const newExpanded = new Set(expandedSections);
+    if (newExpanded.has(section)) {
+      newExpanded.delete(section);
+    } else {
+      newExpanded.add(section);
+    }
+    setExpandedSections(newExpanded);
   };
 
   // Create combined columns for BIA entries and DEXA scans, sorted by date (newest first)
@@ -607,8 +622,18 @@ export default function DataTable({ entries, goals, bodyspecScans = [], onDelete
           daysBetween={daysBetween}
         />
 
+        {/* Muscle Growth Analysis Section - above Body Composition */}
+        {correlations && correlations.length > 0 && (
+          <MuscleGrowthAnalysisSection
+            correlations={correlations}
+            insights={insights}
+            isExpanded={expandedSections.has('growth-analysis')}
+            onToggle={() => toggleSection('growth-analysis')}
+          />
+        )}
+
         {/* Remaining sections */}
-        {(['composition', 'additional', 'recommendations'] as const).map((category) => {
+        {(['composition', 'additional'] as const).map((category) => {
           const metricsInCategory = METRIC_DEFINITIONS.filter(
             (m) => m.category === category
           );
@@ -730,15 +755,14 @@ function CategorySection({
               label={
                 <span className="text-xs inline-flex items-center gap-1">
                   {metric.label}
-                  {metric.description && (
-                    <Tooltip content={metric.description}>
-                      <svg className="w-3 h-3 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </Tooltip>
-                  )}
-                  {metric.normalRange && (
-                    <Tooltip content={`Normal: ${metric.normalRange.min}–${metric.normalRange.max}${metric.unit}`}>
+                  {(metric.description || metric.normalRange) && (
+                    <Tooltip content={
+                      <>
+                        {metric.description && <div>{metric.description}</div>}
+                        {metric.description && metric.normalRange && <div className="mt-1 pt-1 border-t border-gray-600" />}
+                        {metric.normalRange && <div>Normal: {metric.normalRange.min}–{metric.normalRange.max}{metric.unit}</div>}
+                      </>
+                    }>
                       <svg className="w-3 h-3 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -1319,6 +1343,173 @@ function SegmentalSection({
             </TimeSeriesRow>
           );
         })}
+    </>
+  );
+}
+
+// ========================================
+// Muscle Growth Analysis Section
+// ========================================
+
+interface MuscleGrowthAnalysisSectionProps {
+  correlations: CorrelationResult[];
+  insights: Insight[];
+  isExpanded: boolean;
+  onToggle: () => void;
+}
+
+function MuscleGrowthAnalysisSection({
+  correlations,
+  insights,
+  isExpanded,
+  onToggle,
+}: MuscleGrowthAnalysisSectionProps) {
+  const latest = correlations[0];
+  if (!latest) return null;
+
+  const segmentDisplayName = (segment: string): string => {
+    const names: Record<string, string> = {
+      leftArm: 'Left Arm',
+      rightArm: 'Right Arm',
+      trunk: 'Trunk',
+      leftLeg: 'Left Leg',
+      rightLeg: 'Right Leg',
+      arms: 'Arms',
+      legs: 'Legs',
+    };
+    return names[segment] || segment;
+  };
+
+  // Get the most important insight
+  const primaryInsight = insights && insights.length > 0 ? insights[0] : null;
+
+  return (
+    <>
+      <SectionHeaderRow
+        label="Muscle Growth Analysis"
+        color="gray"
+        isExpanded={isExpanded}
+        onToggle={onToggle}
+        columnCount={1}
+      />
+
+      {isExpanded && (
+        <>
+          {/* Primary Insight as visible row */}
+          {primaryInsight && (
+            <TimeSeriesRow
+              label="Insight"
+              columns={[latest.period]}
+              renderCell={() => {
+                const bgColor = primaryInsight.severity === 'warning'
+                  ? 'bg-amber-50/60 dark:bg-amber-900/15'
+                  : primaryInsight.severity === 'tip'
+                  ? 'bg-blue-50/60 dark:bg-blue-900/15'
+                  : 'bg-emerald-50/60 dark:bg-emerald-900/15';
+
+                const icon = primaryInsight.severity === 'warning' ? '⚠️' :
+                             primaryInsight.severity === 'tip' ? '💡' : '✓';
+
+                return (
+                  <td className={`px-2 py-1.5 text-center text-xs ${bgColor}`}>
+                    <Tooltip
+                      content={
+                        <>
+                          <div className="font-medium">{primaryInsight.title}</div>
+                          <div className="text-xs mt-1">{primaryInsight.description}</div>
+                          {primaryInsight.recommendation && (
+                            <div className="text-xs italic mt-1 opacity-90">
+                              {primaryInsight.recommendation}
+                            </div>
+                          )}
+                        </>
+                      }
+                    >
+                      <span className="cursor-help font-medium text-gray-700 dark:text-gray-300">
+                        {icon} {primaryInsight.title}
+                      </span>
+                    </Tooltip>
+                  </td>
+                );
+              }}
+            />
+          )}
+
+          {/* Total Muscle Gain */}
+          <TimeSeriesRow
+            label="Total Muscle Gain"
+            columns={[latest.period]}
+            renderCell={() => (
+              <td className="px-2 py-1.5 text-center text-xs">
+                <span className="text-emerald-600 dark:text-emerald-400">
+                  +{latest.totalMuscleGain.toFixed(1)} lb
+                </span>
+              </td>
+            )}
+          />
+
+          {/* Training Volume */}
+          <TimeSeriesRow
+            label="Training Volume"
+            columns={[latest.period]}
+            renderCell={() => (
+              <td className="px-2 py-1.5 text-center text-xs text-gray-900 dark:text-gray-100">
+                {(latest.totalVolume / 1000).toFixed(0)}k lbs
+              </td>
+            )}
+          />
+
+          {/* Efficiency Score */}
+          <TimeSeriesRow
+            label="Efficiency"
+            columns={[latest.period]}
+            renderCell={() => {
+              const eff = latest.totalVolume / latest.totalMuscleGain;
+              const score = eff < 25000 ? 'Excellent' :
+                            eff < 40000 ? 'Good' : 'Needs Work';
+              const color = eff < 25000 ? 'text-emerald-600' :
+                            eff < 40000 ? 'text-blue-600' : 'text-amber-600';
+
+              return (
+                <td className="px-2 py-1.5 text-center text-xs">
+                  <Tooltip content={`${(eff / 1000).toFixed(0)}k lbs per lb gained`}>
+                    <span className={color}>{score}</span>
+                  </Tooltip>
+                </td>
+              );
+            }}
+          />
+
+          {/* Segmental Breakdown */}
+          {['leftArm', 'rightArm', 'trunk', 'leftLeg', 'rightLeg'].map((segment) => {
+            const change = latest.muscleChanges.find(m => m.segment === segment);
+            const volumeData = latest.volumeBySegment[segment as keyof typeof latest.volumeBySegment];
+
+            return (
+              <TimeSeriesRow
+                key={segment}
+                label={`  ${segmentDisplayName(segment)}`}
+                columns={[latest.period]}
+                renderCell={() => (
+                  <td className="px-2 py-1.5 text-center text-xs">
+                    {change ? (
+                      <Tooltip
+                        content={`Volume: ${volumeData.totalVolumeLbs.toFixed(0)} lbs | Sets: ${volumeData.totalSets}`}
+                      >
+                        <span className={change.changeLbs > 0 ? 'text-emerald-600' : 'text-gray-400'}>
+                          {change.changeLbs > 0 ? '+' : ''}{change.changeLbs.toFixed(1)}
+                        </span>
+                      </Tooltip>
+                    ) : (
+                      <span className="text-gray-300 dark:text-gray-600">—</span>
+                    )}
+                  </td>
+                )}
+              />
+            );
+          })}
+        </>
+      )}
     </>
   );
 }
