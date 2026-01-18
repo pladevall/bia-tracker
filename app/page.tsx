@@ -11,6 +11,7 @@ import { BIAEntry, BodyspecScan, RunningActivity, LiftingWorkout, SleepEntry } f
 import { parsePDFFile } from '@/lib/client-pdf-parser';
 import { ValidationIssue } from '@/lib/pdf-parser';
 import ThemeToggle from '@/components/ThemeToggle';
+import ExportButton from '@/components/ExportButton';
 import { getEntriesFromDb, saveEntryToDb, deleteEntryFromDb, migrateFromLocalStorage, getPendingImages, deletePendingImage, saveOcrDebug, getGoals, saveGoal, deleteGoal, Goal } from '@/lib/supabase';
 
 export default function Home() {
@@ -466,7 +467,10 @@ export default function Home() {
               Unified fitness metrics
             </p>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <ExportButton />
+            <ThemeToggle />
+          </div>
         </header>
 
 
