@@ -40,8 +40,8 @@ function CalendarPageContent({ batchModeOpen, setBatchModeOpen }: CalendarPageCo
 
     return (
         <div className={cn(
-            "mx-auto flex flex-col flex-1 min-h-0 transition-all duration-300 ease-in-out",
-            isWideMode ? "max-w-full px-2 py-2" : "max-w-7xl px-3 sm:px-4 py-3 sm:py-4"
+            "mx-auto flex flex-col flex-1 min-h-0 transition-all duration-300",
+            isWideMode ? "w-full px-2 py-2" : "max-w-7xl px-3 sm:px-4 py-3 sm:py-4"
         )}>
             {/* Header matching exactly app/page.tsx */}
             <header className={cn(
