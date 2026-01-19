@@ -375,36 +375,24 @@ export function SleepTable({ entries, goals, onSaveGoal, onDeleteGoal }: SleepTa
         const goalValue = goalsMap.get(metricKey);
 
         let displayValue = '+';
-        let colorClass = 'text-gray-300 dark:text-gray-600 group-hover:text-blue-500 transition-colors';
+        let colorClass = 'text-gray-300 dark:text-gray-600 group-hover:text-gray-500 transition-colors';
         let tooltipContent: React.ReactNode = 'Set Goal';
 
         if (goalValue) {
             if (currentValue !== undefined && currentValue !== null) {
                 // Determine if goal is met based on direction
                 let isMet = false;
-                let isFar = false;
-
                 if (lowerIsBetter) {
-                    // For negative metrics (Awake, Interruptions), lower is better
                     isMet = currentValue <= goalValue;
-                    isFar = currentValue > goalValue * 1.3; // >30% over goal is "far"
                 } else {
-                    // Standard metrics (Score, Duration), higher is better
                     isMet = currentValue >= goalValue;
-                    isFar = currentValue < goalValue * 0.7; // <70% of goal is "far"
                 }
 
-                if (isMet) {
-                    colorClass = 'text-emerald-600 dark:text-emerald-400';
-                } else if (isFar) {
-                    colorClass = 'text-red-500 dark:text-red-400';
-                } else {
-                    colorClass = 'text-amber-600 dark:text-amber-400';
-                }
+                // Minimalist: use standard gray text
+                colorClass = 'text-gray-700 dark:text-gray-300 font-medium';
+                const statusColor = isMet ? 'text-emerald-500' : 'text-red-500';
 
                 const gap = Math.abs(goalValue - currentValue);
-                const gapStr = type === 'duration' ? formatDuration(gap) : gap.toFixed(1);
-
                 // Label depends on direction
                 let gapLabel = 'Gap';
                 if (lowerIsBetter) {
@@ -429,11 +417,11 @@ export function SleepTable({ entries, goals, onSaveGoal, onDeleteGoal }: SleepTa
                     <div className="flex flex-col gap-0.5 text-xs">
                         <span><span className="font-bold">Goal:</span> {lowerIsBetter ? '< ' : '> '}{fmt(goalValue)} {unit}</span>
                         <span><span className="font-bold">Current:</span> {fmt(currentValue)} {unit}</span>
-                        <span><span className="font-bold">{gapLabel}:</span> {type === 'duration' || type === 'time' ? formatDuration(gap) : gap.toFixed(1)} {unit}</span>
+                        <span className={statusColor}><span className="font-bold">{gapLabel}:</span> {type === 'duration' || type === 'time' ? formatDuration(gap) : gap.toFixed(1)} {unit}</span>
                     </div>
                 );
             } else {
-                colorClass = 'text-blue-600 dark:text-blue-400 font-medium';
+                colorClass = 'text-gray-500 dark:text-gray-400 font-medium';
                 tooltipContent = (
                     <span><span className="font-bold">Goal:</span> {type === 'duration' ? formatDuration(goalValue) : goalValue} {unit}</span>
                 );
@@ -480,6 +468,11 @@ export function SleepTable({ entries, goals, onSaveGoal, onDeleteGoal }: SleepTa
             }
 
             if (idealTimeStr) {
+                // If tooltipContent was just text, wrap it
+                if (typeof tooltipContent === 'string') {
+                    tooltipContent = <span>{tooltipContent}</span>;
+                }
+
                 tooltipContent = (
                     <div className="flex flex-col gap-1 text-xs">
                         {tooltipContent}
@@ -495,7 +488,7 @@ export function SleepTable({ entries, goals, onSaveGoal, onDeleteGoal }: SleepTa
 
         return (
             <td
-                className="group px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20 cursor-pointer hover:bg-blue-100/50 dark:hover:bg-blue-900/40"
+                className="group px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
                 onClick={() => setEditingGoal({ metricKey, label, type })}
             >
                 <Tooltip content={tooltipContent}>
@@ -535,10 +528,11 @@ export function SleepTable({ entries, goals, onSaveGoal, onDeleteGoal }: SleepTa
                             </div>
                         </th>
 
-                        {/* Goal column */}
-                        <th className="px-2 py-2 text-center min-w-[100px] border-l border-gray-100 dark:border-gray-800 bg-blue-50/70 dark:bg-blue-900/20">
+                        {/* Goal column - Minimalist header */}
+                        <th className="px-2 py-2 text-center min-w-[100px] border-l border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
                             <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Goal</span>
                         </th>
+
 
                         {/* Trend column */}
                         <th className="px-2 py-2 text-center min-w-[100px] border-l border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">

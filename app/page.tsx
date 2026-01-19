@@ -18,6 +18,7 @@ import { correlateMeasurements } from '@/lib/correlation-utils';
 import { generateVolumeEfficiencyInsights, generateBalanceInsights, generatePeriodizationInsights } from '@/lib/correlation-insights';
 import { analyzeBodyPartBalance } from '@/lib/correlation-utils';
 import { useBaselineData } from '@/lib/use-baseline-data';
+import ViewToggle, { ViewMode } from '@/components/ViewToggle';
 
 export default function Home() {
   // SWR cached data for instant navigation
@@ -120,7 +121,29 @@ export default function Home() {
 
   const visibleScans = bodyspecScans.filter(scan => !hiddenScans.has(scan.id));
 
+
   const router = useRouter();
+
+  // View Mode State
+  const [viewMode, setViewMode] = useState<ViewMode>('all');
+
+  // Load view mode from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('baselineViewMode');
+    if (saved && ['all', 'workouts', 'sleep', 'measurements'].includes(saved)) {
+      setViewMode(saved as ViewMode);
+    }
+  }, []);
+
+  const handleViewChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem('baselineViewMode', mode);
+  }, []);
+
+  const shouldShowSection = useCallback((section: ViewMode) => {
+    if (viewMode === 'all') return true;
+    return viewMode === section;
+  }, [viewMode]);
 
   // Keyboard shortcut: Cmd+Shift+C to go to Calendar
   useEffect(() => {
@@ -558,13 +581,17 @@ export default function Home() {
 
 
 
-        {/* Workouts Section - show if there are any workouts */}
-        {(runningActivities.length > 0 || liftingWorkouts.length > 0) && (
+
+        {/* Workouts Section */}
+        {shouldShowSection('workouts') && (runningActivities.length > 0 || liftingWorkouts.length > 0) && (
           <section className="mb-6 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center min-h-[50px]">
               <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">
                 Workouts
               </h2>
+              {(viewMode === 'all' || viewMode === 'workouts') && (
+                <ViewToggle viewMode={viewMode} onViewChange={handleViewChange} />
+              )}
             </div>
             <WorkoutTable
               runningActivities={runningActivities}
@@ -576,13 +603,16 @@ export default function Home() {
           </section>
         )}
 
-        {/* Sleep Section - show if there are any sleep entries */}
-        {sleepEntries.length > 0 && (
+        {/* Sleep Section */}
+        {shouldShowSection('sleep') && sleepEntries.length > 0 && (
           <section className="mb-6 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center min-h-[50px]">
               <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">
                 Sleep
               </h2>
+              {viewMode === 'sleep' && (
+                <ViewToggle viewMode={viewMode} onViewChange={handleViewChange} />
+              )}
             </div>
             <div>
               <SleepTable
@@ -595,47 +625,57 @@ export default function Home() {
           </section>
         )}
 
-        <section className="mb-6 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-            <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              Measurements
-            </h2>
-          </div>
-          <DataTable
-            entries={entries}
-            goals={goals}
-            bodyspecScans={visibleScans}
-            correlations={correlations}
-            insights={insights}
-            onDelete={handleDelete}
-            onSaveGoal={handleSaveGoal}
-            onDeleteGoal={handleDeleteGoal}
+        {/* Measurements Section */}
+        {shouldShowSection('measurements') && (
+          <section className="mb-6 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center min-h-[50px]">
+              <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                Measurements
+              </h2>
+              {viewMode === 'measurements' && (
+                <ViewToggle viewMode={viewMode} onViewChange={handleViewChange} />
+              )}
+            </div>
+            <DataTable
+              entries={entries}
+              goals={goals}
+              bodyspecScans={visibleScans}
+              correlations={correlations}
+              insights={insights}
+              onDelete={handleDelete}
+              onSaveGoal={handleSaveGoal}
+              onDeleteGoal={handleDeleteGoal}
+            />
+          </section>
+        )}
+
+        {/* Unified Integrations Section - Only show in 'all' mode or specific modes if desired? 
+            Let's keep it visible in 'all' mode, maybe hide in focused modes to reduce clutter. 
+            User didn't specify, but "Compact Mode" implies focus. 
+        */}
+        {viewMode === 'all' && (
+          <IntegrationTabs
+            onUpload={handleUpload}
+            isUploading={isLoading}
+            uploadProgress={progress}
+            uploadError={error}
+            bodyspecConnections={bodyspecConnections}
+            bodyspecScans={bodyspecScans}
+            hiddenScans={hiddenScans}
+            onBodyspecConnectionChange={loadBodyspecData}
+            onBodyspecDisconnect={handleBodyspecDisconnect}
+            onBodyspecSync={() => loadBodyspecData()}
+            onToggleScanVisibility={toggleScanVisibility}
+            onShowOnlyLatest={showOnlyLatest}
+            stravaConnections={stravaConnections}
+            onStravaConnectionChange={loadWorkoutData}
+            hevyConnections={hevyConnections}
+            onHevyConnectionChange={loadWorkoutData}
+            runningActivities={runningActivities}
+            liftingWorkouts={liftingWorkouts}
+            onWorkoutSync={loadWorkoutData}
           />
-        </section>
-
-
-        {/* Unified Integrations Section */}
-        <IntegrationTabs
-          onUpload={handleUpload}
-          isUploading={isLoading}
-          uploadProgress={progress}
-          uploadError={error}
-          bodyspecConnections={bodyspecConnections}
-          bodyspecScans={bodyspecScans}
-          hiddenScans={hiddenScans}
-          onBodyspecConnectionChange={loadBodyspecData}
-          onBodyspecDisconnect={handleBodyspecDisconnect}
-          onBodyspecSync={() => loadBodyspecData()}
-          onToggleScanVisibility={toggleScanVisibility}
-          onShowOnlyLatest={showOnlyLatest}
-          stravaConnections={stravaConnections}
-          onStravaConnectionChange={loadWorkoutData}
-          hevyConnections={hevyConnections}
-          onHevyConnectionChange={loadWorkoutData}
-          runningActivities={runningActivities}
-          liftingWorkouts={liftingWorkouts}
-          onWorkoutSync={loadWorkoutData}
-        />
+        )}
 
         {/* Validation Warning Modal */}
         {validationState && (

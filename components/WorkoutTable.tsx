@@ -818,44 +818,24 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
         const goalValue = explicitGoalValue !== undefined ? explicitGoalValue : goalsMap.get(metricKey);
 
         let displayValue = '—';
-        let colorClass = 'text-gray-300 dark:text-gray-500';
+        // Minimalist: Standard gray text
+        let colorClass = 'text-gray-400 dark:text-gray-500';
         let tooltipContent: React.ReactNode = null;
 
         if (goalValue) {
-            // Determine progress status and color
+            // Keep status calculation for Tooltip, but NOT for cell color
             if (currentValue !== undefined && currentValue !== null) {
                 const isPace = type === 'pace';
-                // For pace, lower is better. For others, higher is better.
-                let ratio = isPace
-                    ? (currentValue > 0 ? goalValue / currentValue : 0) // If current=0 (no run), ratio 0. If current is really fast (small), ratio high.
-                    : currentValue / goalValue;
-
-                // Correction for pace: actually we want to check if current <= goal.
-                // Let's use simple comparisons instead of ratio for status
                 let isMet = false;
-                let isFar = false;
 
                 if (isPace) {
-                    // Goal 8:00 (480s), Current 9:00 (540s) -> Not met.
-                    // Met if current <= goal
                     if (currentValue > 0) {
                         isMet = currentValue <= goalValue;
-                        isFar = currentValue > goalValue * 1.15; // >15% slower
                     }
                 } else {
                     isMet = currentValue >= goalValue;
-                    isFar = currentValue < goalValue * 0.7; // <70% complete
                 }
 
-                if (isMet) {
-                    colorClass = 'text-emerald-600 dark:text-emerald-400';
-                } else if (isFar) {
-                    colorClass = 'text-red-500 dark:text-red-400';
-                } else {
-                    colorClass = 'text-amber-600 dark:text-amber-400'; // Close/Progressing
-                }
-
-                // Calculate Gap
                 const gap = Math.abs(goalValue - currentValue);
                 let gapStr = '';
                 if (type === 'duration') gapStr = formatDuration(gap);
@@ -863,15 +843,21 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
                 else gapStr = gap.toLocaleString(undefined, { maximumFractionDigits: 1 });
 
                 const gapLabel = isMet ? 'Exceeded by' : 'Gap';
+                // Add status color to tooltip only
+                const statusColor = isMet ? 'text-emerald-500' : 'text-red-500';
+
                 tooltipContent = (
                     <div className="flex flex-col gap-0.5 text-xs">
                         <span><span className="font-bold">Goal:</span> {type === 'duration' ? formatDuration(goalValue) : type === 'pace' ? formatPace(goalValue) : goalValue.toLocaleString()} {unit}</span>
                         <span><span className="font-bold">Current:</span> {type === 'duration' ? formatDuration(currentValue) : type === 'pace' ? formatPace(currentValue) : currentValue.toLocaleString(undefined, { maximumFractionDigits: 1 })} {unit}</span>
-                        <span><span className="font-bold">{gapLabel}:</span> {gapStr} {unit}</span>
+                        <span className={statusColor}><span className="font-bold">{gapLabel}:</span> {gapStr} {unit}</span>
                     </div>
                 );
+
+                // Use slightly darker gray for set goals to distinguish from placeholder
+                colorClass = 'text-gray-500 dark:text-gray-400 font-medium';
             } else {
-                colorClass = 'text-blue-600 dark:text-blue-400 font-medium';
+                colorClass = 'text-gray-500 dark:text-gray-400 font-medium';
                 tooltipContent = (
                     <span><span className="font-bold">Goal:</span> {type === 'duration' ? formatDuration(goalValue) : type === 'pace' ? formatPace(goalValue) : goalValue.toLocaleString()}</span>
                 );
@@ -886,13 +872,13 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
             }
         } else {
             displayValue = explicitGoalValue !== undefined ? '—' : '+';
-            colorClass = 'text-gray-300 dark:text-gray-600 group-hover:text-blue-500 transition-colors';
+            colorClass = 'text-gray-300 dark:text-gray-600 group-hover:text-gray-500 transition-colors';
             tooltipContent = explicitGoalValue !== undefined ? 'Add goals to body parts to see total' : 'Set Goal';
         }
 
         return (
             <td
-                className={`group px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/50 dark:bg-blue-900/20 ${explicitGoalValue !== undefined ? '' : 'cursor-pointer hover:bg-blue-100/50 dark:hover:bg-blue-900/40'}`}
+                className={`group px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/50 ${explicitGoalValue !== undefined ? '' : 'cursor-pointer'}`}
                 onClick={() => explicitGoalValue === undefined && setEditingGoal({ metricKey, label, type })}
             >
                 {goalValue ? (
@@ -917,27 +903,28 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
             }
             headerFixedContent={
                 <>
-                    <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800 bg-blue-50/70 dark:bg-blue-900/20">
+                    <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
                         <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Goal</span>
                     </th>
+
                     <th className="px-2 py-2 text-center min-w-[80px] border-l border-gray-100 dark:border-gray-800 bg-blue-50 dark:bg-blue-900/40">
                         <div className={`flex flex-col items-center ${workoutType === 'run' ? 'justify-center' : 'gap-1'}`}>
                             <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Workload</span>
                             {workoutType !== 'run' && (
-                            <div className="flex gap-0.5">
-                                {(['sets', 'volume'] as VolumeDisplayMode[]).map(mode => (
-                                    <button
-                                        key={mode}
-                                        onClick={() => setVolumeDisplayMode(mode)}
-                                        className={`px-1.5 py-0.5 text-[9px] rounded transition-colors ${volumeDisplayMode === mode
-                                            ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 font-medium'
-                                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                                            }`}
-                                    >
-                                        {mode === 'sets' ? 'Sets' : 'Vol'}
-                                    </button>
-                                ))}
-                            </div>
+                                <div className="flex gap-0.5">
+                                    {(['sets', 'volume'] as VolumeDisplayMode[]).map(mode => (
+                                        <button
+                                            key={mode}
+                                            onClick={() => setVolumeDisplayMode(mode)}
+                                            className={`px-1.5 py-0.5 text-[9px] rounded transition-colors ${volumeDisplayMode === mode
+                                                ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 font-medium'
+                                                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                                }`}
+                                        >
+                                            {mode === 'sets' ? 'Sets' : 'Vol'}
+                                        </button>
+                                    ))}
+                                </div>
                             )}
                         </div>
                     </th>

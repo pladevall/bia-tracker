@@ -220,10 +220,12 @@ function getGoalProgress(current: number, target: number, higherIsBetter: boolea
   }
 }
 
+
 function getGoalProgressColor(progress: GoalProgress): string {
+  // Minimalist: always return gray/standard colors
   switch (progress) {
-    case 'met': return 'text-emerald-600 dark:text-emerald-400';
-    case 'close': return 'text-amber-600 dark:text-amber-400';
+    case 'met': return 'text-gray-500 dark:text-gray-400';
+    case 'close': return 'text-gray-500 dark:text-gray-400';
     case 'far': return 'text-gray-500 dark:text-gray-400';
     default: return 'text-gray-400';
   }
@@ -477,6 +479,7 @@ export default function DataTable({ entries, goals, bodyspecScans = [], correlat
 
   const comparisonEntry = getComparisonEntry(entries, trendPeriod);
   const goalsMap = new Map(goals.map(g => [g.metricKey, g.targetValue]));
+
   const daysBetween = entries.length > 0 ? getDaysBetweenEntries(entries[0], comparisonEntry) : 0;
 
   if (entries.length === 0) {
@@ -495,7 +498,7 @@ export default function DataTable({ entries, goals, bodyspecScans = [], correlat
         stickyColumnWidth="min-w-[180px]"
         headerFixedContent={
           <>
-            <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800 bg-blue-50/70 dark:bg-blue-900/20">
+            <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
               <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Goal</span>
             </th>
             <th className="px-2 py-2 text-center min-w-[60px] border-l border-gray-100 dark:border-gray-800 bg-blue-50 dark:bg-blue-900/40">
@@ -773,7 +776,7 @@ function CategorySection({
               fixedContent={
                 <>
                   <td
-                    className={`px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10 ${isGoalEligible ? 'cursor-pointer hover:bg-blue-100/50 dark:hover:bg-blue-900/30' : ''}`}
+                    className={`px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/50 ${isGoalEligible ? 'cursor-pointer' : ''}`}
                     onClick={isGoalEligible ? () => onEditGoal({ metricKey: metric.key as string, label: metric.label }) : undefined}
                   >
                     {goalValue && latestValue ? (
@@ -787,7 +790,7 @@ function CategorySection({
                         {goalValue.toFixed(1)}
                       </span>
                     ) : isGoalEligible ? (
-                      <span className="text-xs text-gray-300 dark:text-gray-600">+</span>
+                      <span className="text-xs text-gray-300 dark:text-gray-600 group-hover:text-gray-500 transition-colors">+</span>
                     ) : (
                       <span className="text-xs text-gray-300 dark:text-gray-500">—</span>
                     )}
@@ -1251,7 +1254,7 @@ function SegmentalSection({
               fixedContent={
                 <>
                   <td
-                    className={`px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 bg-blue-50/30 dark:bg-blue-900/10 ${isGoalEligible ? 'cursor-pointer hover:bg-blue-100/50 dark:hover:bg-blue-900/30' : ''}`}
+                    className={`px-2 py-1.5 text-center border-l border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/50 ${isGoalEligible ? 'cursor-pointer' : ''}`}
                     onClick={isGoalEligible ? () => onEditGoal({ metricKey: field.key as string, label: field.label }) : undefined}
                   >
                     {goalValue && latestLb ? (
