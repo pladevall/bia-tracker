@@ -7,7 +7,6 @@ import { calculateBetScore, getScoreColor, getScoreLabel, parseTimelineYears } f
 import { formatDownside, formatCurrency } from '@/lib/practice/formatting';
 import { getEffectiveConfidence, isComputedConfidence, calculateExpectedValue, calculateBetTimeline, calculateAutoUpside } from '@/lib/practice/bet-calculations';
 import BetForm from './BetForm';
-import UserSettingsModal from './UserSettingsModal';
 import Tooltip from '@/components/Tooltip';
 
 // Score guidance helper
@@ -125,6 +124,13 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
     const [editingBet, setEditingBet] = useState<Bet | null>(null);
     const [editingField, setEditingField] = useState<{ betId: string; field: string } | null>(null);
     const [editValue, setEditValue] = useState('');
+    const [salaryInput, setSalaryInput] = useState(String(userSettings?.annual_salary ?? 150000));
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Sync salary input when userSettings changes
+    React.useEffect(() => {
+        setSalaryInput(String(userSettings?.annual_salary ?? 150000));
+    }, [userSettings?.annual_salary]);
 
     // Compute scores and sort
     const sortedBets = useMemo(() => {
@@ -352,18 +358,89 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
             <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                 <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">Bets</h2>
-                <div className="flex items-center gap-3">
-                    {/* Annual Salary Badge */}
-                    <button
-                        onClick={() => setIsSettingsOpen(true)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                        title="Click to edit opportunity cost"
-                    >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {formatCurrency(userSettings?.annual_salary ?? 150000)}
-                    </button>
+                <div className="flex items-center gap-3 relative">
+                    {/* Annual Salary Badge with Popover */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            title="Click to edit opportunity cost"
+                        >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {formatCurrency(userSettings?.annual_salary ?? 150000)}
+                        </button>
+
+                        {/* Settings Popover */}
+                        {isSettingsOpen && (
+                            <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4 z-40">
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                            Annual Salary (Opportunity Cost)
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={salaryInput}
+                                                onChange={(e) => setSalaryInput(e.target.value)}
+                                                placeholder="e.g., 150000"
+                                                className="flex-1 px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono"
+                                            />
+                                            <div className="flex items-center px-2.5 py-1.5 bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded text-green-700 dark:text-green-300 text-xs font-medium whitespace-nowrap">
+                                                {salaryInput ? formatCurrency(parseInt(salaryInput.replace(/[^0-9]/g, '')) || undefined) : '-'}
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1.5">
+                                            Used to calculate downside: timeline × salary
+                                        </p>
+                                    </div>
+
+                                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSalaryInput(String(userSettings?.annual_salary ?? 150000));
+                                                setIsSettingsOpen(false);
+                                            }}
+                                            className="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={isSaving || !salaryInput}
+                                            onClick={async () => {
+                                                const parsed = parseInt(salaryInput.replace(/[^0-9]/g, ''));
+                                                if (isNaN(parsed) || parsed <= 0) return;
+
+                                                setIsSaving(true);
+                                                try {
+                                                    const res = await fetch('/api/practice/user-settings', {
+                                                        method: 'PUT',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ annual_salary: parsed }),
+                                                    });
+                                                    if (res.ok) {
+                                                        onRefresh?.();
+                                                        setIsSettingsOpen(false);
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Error updating user settings:', error);
+                                                } finally {
+                                                    setIsSaving(false);
+                                                }
+                                            }}
+                                            className="px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded transition-colors"
+                                        >
+                                            {isSaving ? 'Saving...' : 'Save'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     <div className="flex items-center gap-3">
                         <button
@@ -1170,28 +1247,6 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                 </div>
             )}
 
-            {/* Settings Modal */}
-            {isSettingsOpen && (
-                <UserSettingsModal
-                    settings={userSettings || { id: 1, annual_salary: 150000, created_at: '', updated_at: '' }}
-                    isOpen={isSettingsOpen}
-                    onClose={() => setIsSettingsOpen(false)}
-                    onSave={async (updates) => {
-                        try {
-                            const res = await fetch('/api/practice/user-settings', {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(updates),
-                            });
-                            if (res.ok) {
-                                onRefresh?.();
-                            }
-                        } catch (error) {
-                            console.error('Error updating user settings:', error);
-                        }
-                    }}
-                />
-            )}
         </div>
     );
 }
