@@ -1,0 +1,4 @@
+{
+  "add-action": "dist/add-action.js",
+  "add-belief": "dist/add-belief.js"
+}
