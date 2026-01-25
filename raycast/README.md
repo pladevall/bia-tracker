@@ -1,4 +1,4 @@
-# Raycast - BIA Tracker
+# Raycast - Baseline
 
 Raycast extension to add actions and beliefs quickly.
 

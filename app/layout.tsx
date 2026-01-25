@@ -4,6 +4,7 @@ import "./globals.css";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import { AgentationWrapper } from "@/components/AgentationWrapper";
+import QuickAddBar from "@/components/QuickAddBar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,6 +54,7 @@ export default function RootLayout({
         {children}
         <ServiceWorkerRegistration />
         <KeyboardShortcuts />
+        <QuickAddBar />
         <AgentationWrapper />
       </body>
     </html>

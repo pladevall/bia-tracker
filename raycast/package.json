@@ -1,8 +1,8 @@
 {
-  "name": "bia-tracker",
-  "title": "BIA Tracker",
-  "description": "Quickly add beliefs and actions to BIA Tracker.",
-  "icon": "assets/command-icon.svg",
+  "name": "baseline",
+  "title": "Baseline",
+  "description": "Quickly add beliefs and actions to Baseline.",
+  "icon": "assets/baseline-icon.svg",
   "author": "BIA Tracker",
   "license": "MIT",
   "commands": [
@@ -38,6 +38,10 @@
   "dependencies": {
     "@raycast/api": "^1.83.1",
     "@raycast/utils": "^1.15.0"
+  },
+  "scripts": {
+    "build": "raycast build",
+    "dev": "raycast dev"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",
