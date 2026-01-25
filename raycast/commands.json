@@ -1,4 +1,4 @@
 {
-  "add-action": "add-action.js",
-  "add-belief": "add-belief.js"
+  "add-action": "dist/add-action.js",
+  "add-belief": "dist/add-belief.js"
 }

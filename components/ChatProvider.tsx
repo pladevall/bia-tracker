@@ -41,6 +41,35 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add("chat-open");
+    } else {
+      document.body.classList.remove("chat-open");
+    }
+
+    return () => {
+      document.body.classList.remove("chat-open");
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      const isEditable = target?.isContentEditable || tag === "input" || tag === "textarea" || tag === "select";
+      if (isEditable) return;
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        toggle();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [toggle]);
+
   const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
@@ -95,7 +124,6 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
         <div className="fixed right-0 top-0 h-full w-[420px] max-w-[90vw] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 shadow-2xl z-50 flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
             <div className="flex items-center gap-2">
-              <span className="text-lg">💬</span>
               <h3 className="font-semibold text-gray-900 dark:text-gray-100">Chat</h3>
             </div>
             <div className="flex items-center gap-2">

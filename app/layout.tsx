@@ -53,11 +53,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ChatProvider>
-          {children}
-          <ServiceWorkerRegistration />
-          <KeyboardShortcuts />
-          <QuickAddBar />
-          <AgentationWrapper />
+          <div className="app-shell">
+            {children}
+            <ServiceWorkerRegistration />
+            <KeyboardShortcuts />
+            <QuickAddBar />
+            <AgentationWrapper />
+          </div>
         </ChatProvider>
       </body>
     </html>
