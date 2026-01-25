@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { BIAEntry } from './types';
+import { autoCorrectEntry } from './pdf-parser';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -34,7 +35,16 @@ export async function getEntriesFromDb(): Promise<BIAEntry[]> {
     return [];
   }
 
-  return (data || []).map(row => row.data as BIAEntry);
+  const entries = (data || []).map(row => row.data as BIAEntry);
+
+  for (let i = 0; i < entries.length - 1; i++) {
+    const corrected = autoCorrectEntry(entries[i], entries[i + 1]);
+    if (corrected) {
+      entries[i] = corrected;
+    }
+  }
+
+  return entries;
 }
 
 export async function deleteEntryFromDb(id: string): Promise<void> {
