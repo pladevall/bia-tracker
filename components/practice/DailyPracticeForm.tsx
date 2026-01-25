@@ -122,29 +122,12 @@ export default function DailyPracticeForm({
     const isFormValid = beliefExamined.trim() && boldRisk.trim();
 
     return (
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200/50 dark:border-gray-800/50 p-8">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        Today&apos;s Practice
-                    </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {todayDate}
-                    </p>
+        <div>
+            {isCompleted && (
+                <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <span className="text-xs font-medium text-green-700 dark:text-green-400">✓ Completed today</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    {streak.current_streak > 0 && (
-                        <span className="px-2.5 py-0.5 text-xs font-medium text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30 rounded-full border border-orange-200 dark:border-orange-800">
-                            {streak.current_streak} Day Streak
-                        </span>
-                    )}
-                    {isCompleted && (
-                        <span className="px-2.5 py-0.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 rounded-full">
-                            ✓ Completed
-                        </span>
-                    )}
-                </div>
-            </div>
+            )}
 
             <div className="space-y-6">
                 {/* What do I believe? (Beliefs Dropdown) */}
