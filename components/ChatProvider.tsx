@@ -66,7 +66,19 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       const isEditable = target?.isContentEditable || tag === "input" || tag === "textarea" || tag === "select";
       if (isEditable) return;
 
+      if (e.key === "Escape" && isOpen) {
+        e.preventDefault();
+        close();
+        return;
+      }
+
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        toggle();
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "e") {
         e.preventDefault();
         toggle();
       }
@@ -74,7 +86,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [toggle]);
+  }, [toggle, close, isOpen]);
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || isLoading) return;
