@@ -107,8 +107,8 @@ export function InboxPopover() {
                     <div className="flex items-center justify-between p-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-zinc-900/50">
                         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                             Inbox
-                            {events.length > 0 && <span className="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">{events.length} pending</span>}
                         </h3>
+                        {events.length > 0 && <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{events.length} pending</span>}
                         {isLoading && <Loader2 size={14} className="animate-spin text-gray-400" />}
                     </div>
 
