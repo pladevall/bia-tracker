@@ -53,6 +53,12 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     };
   }, [isOpen]);
 
+  const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
+  const open = useCallback(() => setIsOpen(true), []);
+  const close = useCallback(() => setIsOpen(false), []);
+
+  const ctxValue = useMemo(() => ({ isOpen, toggle, open, close }), [isOpen, toggle, open, close]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -69,12 +75,6 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [toggle]);
-
-  const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
-  const open = useCallback(() => setIsOpen(true), []);
-  const close = useCallback(() => setIsOpen(false), []);
-
-  const ctxValue = useMemo(() => ({ isOpen, toggle, open, close }), [isOpen, toggle, open, close]);
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || isLoading) return;
