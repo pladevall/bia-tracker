@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import type { Bet, Belief, BoldTake, UserSettings } from '@/lib/practice/types';
 import { UPSIDE_OPTIONS } from '@/lib/practice/types';
-import { parseTimelineYears } from '@/lib/practice/bet-scoring';
+import { calculateBetScore, parseTimelineYears } from '@/lib/practice/bet-scoring';
 import { formatDownside, formatCurrency } from '@/lib/practice/formatting';
 import { getEffectiveConfidence, isComputedConfidence, calculateExpectedValue, calculateBetTimeline, calculateAutoUpside, calculateBeliefDuration } from '@/lib/practice/bet-calculations';
 import BetForm from './BetForm';
@@ -579,7 +579,7 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                 const expectedValue = calculateExpectedValue(displayUpside, calculatedDownside);
 
                                 return (
-                                    <>
+                                    <React.Fragment key={bet.id}>
                                         {/* Main Bet Row */}
                                         <tr
                                             key={bet.id}
@@ -774,7 +774,7 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                     <div className="space-y-1">
                                                         <div className="font-semibold text-white">Expected Value:</div>
                                                         <div className="text-xs font-mono space-y-0.5">
-                                                            <div>{formatCurrency(effectiveDownside)} × {displayUpside}x</div>
+                                                            <div>{formatCurrency(calculatedDownside)} × {displayUpside}x</div>
                                                             <div className="border-t border-gray-600 pt-0.5 mt-0.5">= {formatCurrency(expectedValue || 0)}</div>
                                                         </div>
                                                         {timelineYears > 0 && (
@@ -1282,7 +1282,7 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                 )}
                                             </>
                                         )}
-                                    </>
+                                    </React.Fragment>
                                 );
                             })}
 
