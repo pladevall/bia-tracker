@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Bet, Belief, BoldTake, UserSettings } from '@/lib/practice/types';
 import { UPSIDE_OPTIONS } from '@/lib/practice/types';
@@ -326,10 +327,13 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
         return [...ordered, ...missing];
     }, [actionOrder]);
 
-    const handleBetDragEnd = useCallback(async (event: { active: { id: string }; over: { id: string } | null }) => {
-        if (!event.over || event.active.id === event.over.id) return;
-        const activeIndex = betOrder.indexOf(event.active.id);
-        const overIndex = betOrder.indexOf(event.over.id);
+    const handleBetDragEnd = useCallback(async (event: DragEndEvent) => {
+        if (!event.over) return;
+        const activeId = String(event.active.id);
+        const overId = String(event.over.id);
+        if (activeId === overId) return;
+        const activeIndex = betOrder.indexOf(activeId);
+        const overIndex = betOrder.indexOf(overId);
         if (activeIndex === -1 || overIndex === -1) return;
         const newOrder = arrayMove(betOrder, activeIndex, overIndex);
         setBetOrder(newOrder);
@@ -347,13 +351,16 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
     }, [betOrder, onRefresh]);
 
     const handleActionDragEnd = useCallback(async (
-        event: { active: { id: string }; over: { id: string } | null },
+        event: DragEndEvent,
         groupKey: string
     ) => {
-        if (!event.over || event.active.id === event.over.id) return;
+        if (!event.over) return;
+        const activeId = String(event.active.id);
+        const overId = String(event.over.id);
+        if (activeId === overId) return;
         const currentOrder = actionOrder[groupKey] || [];
-        const activeIndex = currentOrder.indexOf(event.active.id);
-        const overIndex = currentOrder.indexOf(event.over.id);
+        const activeIndex = currentOrder.indexOf(activeId);
+        const overIndex = currentOrder.indexOf(overId);
         if (activeIndex === -1 || overIndex === -1) return;
         const newOrder = arrayMove(currentOrder, activeIndex, overIndex);
 
