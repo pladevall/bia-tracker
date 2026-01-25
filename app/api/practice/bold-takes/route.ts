@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getBoldTakes, createBoldTake } from '@/lib/practice/supabase-practice';
-import { NextResponse } from 'next/server';
 
 export async function GET() {
     try {
