@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { CalendarProvider, useCalendar } from './calendar-context';
 import { YearGrid } from './year-grid';
 import { EventModal } from './event-modal';
-import { BatchInputMode } from './batch-input-mode';
 import { InboxPopover } from './inbox-popover';
 import ThemeToggle from '@/components/ThemeToggle';
 import { CalendarEvent } from '@/types/calendar';
@@ -18,11 +17,10 @@ interface CalendarPageClientProps {
 }
 
 interface CalendarPageContentProps {
-    batchModeOpen: boolean;
-    setBatchModeOpen: (open: boolean) => void;
+    // No props needed currently
 }
 
-function CalendarPageContent({ batchModeOpen, setBatchModeOpen }: CalendarPageContentProps) {
+function CalendarPageContent({ }: CalendarPageContentProps) {
     const { isWideMode, toggleWideMode } = useCalendar();
 
     // Wide mode keyboard shortcut
@@ -56,13 +54,7 @@ function CalendarPageContent({ batchModeOpen, setBatchModeOpen }: CalendarPageCo
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setBatchModeOpen(true)}
-                        title="Batch input mode (Cmd+Shift+B)"
-                        className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                    >
-                        <Plus size={18} />
-                    </button>
+
                     <InboxPopover />
                     <button
                         onClick={toggleWideMode}
@@ -75,6 +67,17 @@ function CalendarPageContent({ batchModeOpen, setBatchModeOpen }: CalendarPageCo
                         {isWideMode ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                     </button>
                     <ThemeToggle />
+                    <Link
+                        href="/practice"
+                        title="Practice (Cmd+Shift+P)"
+                        className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                            <path d="M2 17l10 5 10-5" />
+                            <path d="M2 12l10 5 10-5" />
+                        </svg>
+                    </Link>
                     <Link
                         href="/"
                         title="Go to Baseline (Cmd+Shift+C)"
@@ -93,30 +96,24 @@ function CalendarPageContent({ batchModeOpen, setBatchModeOpen }: CalendarPageCo
             </section>
 
             <EventModal />
-            <BatchInputMode
-                isOpen={batchModeOpen}
-                onClose={() => setBatchModeOpen(false)}
-            />
         </div>
     );
 }
 
 export function CalendarPageClient({ initialEvents }: CalendarPageClientProps) {
-    const [batchModeOpen, setBatchModeOpen] = useState(false);
     const router = useRouter();
-
-    // Add keyboard shortcuts (Batch mode and navigation - outside of context)
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Cmd+Shift+B for batch mode
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setBatchModeOpen(prev => !prev);
-            }
-            // Cmd+Shift+C to toggle between Baseline and Calendar
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'C') {
-                e.preventDefault();
-                router.push('/');
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
+                // Cmd+Shift+C to toggle between Baseline and Calendar
+                if (e.key === 'C') {
+                    e.preventDefault();
+                    router.push('/');
+                } else if (e.key === 'P' || e.key === 'p') {
+                    // Cmd+Shift+P to go to Practice
+                    e.preventDefault();
+                    router.push('/practice');
+                }
             }
         };
 
@@ -126,10 +123,7 @@ export function CalendarPageClient({ initialEvents }: CalendarPageClientProps) {
 
     return (
         <CalendarProvider initialEvents={initialEvents}>
-            <CalendarPageContent
-                batchModeOpen={batchModeOpen}
-                setBatchModeOpen={setBatchModeOpen}
-            />
+            <CalendarPageContent />
         </CalendarProvider>
     );
 }

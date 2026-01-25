@@ -16,6 +16,7 @@ export function EventModal() {
     const [category, setCategory] = useState<CalendarCategoryKey>('deep_work');
     const [startDate, setStartDate] = useState<string>('');
     const [endDate, setEndDate] = useState<string>('');
+    const [notes, setNotes] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -59,12 +60,14 @@ export function EventModal() {
             setCategory(selectedEvent.category);
             setStartDate(selectedEvent.start_date);
             setEndDate(selectedEvent.end_date);
+            setNotes(selectedEvent.notes || '');
         } else if (isModalOpen && modalStartDate && modalEndDate) {
             // Creating new event
             setTitle('');
             setCategory('deep_work');
             setStartDate(format(modalStartDate, 'yyyy-MM-dd'));
             setEndDate(format(modalEndDate, 'yyyy-MM-dd'));
+            setNotes('');
         }
         setDeleteConfirm(false);
     }, [isModalOpen, selectedEvent, modalStartDate, modalEndDate]);
@@ -127,6 +130,7 @@ export function EventModal() {
                 end_date: endDate,
                 title,
                 category,
+                notes,
             };
 
             if (isEditMode) {
@@ -231,6 +235,8 @@ export function EventModal() {
                     setEndDate={setEndDate}
                     category={category}
                     setCategory={setCategory}
+                    notes={notes}
+                    setNotes={setNotes}
                     isEditMode={isEditMode}
                     disabled={isSaving || isDeleting}
                 />

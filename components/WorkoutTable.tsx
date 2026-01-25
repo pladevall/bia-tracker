@@ -1,7 +1,7 @@
 'use client';
 
 // KEEP CONSISTENT: Use 'text-gray-300 dark:text-gray-600' for all empty state dashes to ensure subtle but visible styling.
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 // KEEP CONSISTENT: Use 'text-gray-300 dark:text-gray-600' for all empty state dashes to ensure subtle but visible styling.
 import { RunningActivity, LiftingWorkout, WorkoutType, VolumePeriod, BODY_PARTS, RUNNING_MILESTONES } from '@/lib/types';
 // KEEP CONSISTENT: Use 'text-gray-300 dark:text-gray-600' for all empty state dashes to ensure subtle but visible styling.
@@ -139,7 +139,16 @@ const COMPOUND_EXERCISES = [
 ] as const;
 
 export default function WorkoutTable({ runningActivities, liftingWorkouts, goals, onSaveGoal, onDeleteGoal }: WorkoutTableProps) {
-    const [workoutType, setWorkoutType] = useState<WorkoutType>('all');
+    // Load workoutType from localStorage with default fallback
+    const [workoutType, setWorkoutType] = useState<WorkoutType>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('baselineWorkoutType');
+            if (saved && ['all', 'lifting', 'run'].includes(saved)) {
+                return saved as WorkoutType;
+            }
+        }
+        return 'all';
+    });
     const [volumePeriod, setVolumePeriod] = useState<VolumePeriod>('WTD');
     const [volumeDisplayMode, setVolumeDisplayMode] = useState<VolumeDisplayMode>('sets');
     const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('WTD');
@@ -149,6 +158,11 @@ export default function WorkoutTable({ runningActivities, liftingWorkouts, goals
     const [highlightedRanges, setHighlightedRanges] = useState<{ metricKey: string; current: { start: Date; end: Date }; previous: { start: Date; end: Date }; sentiment: HighlightSentiment } | null>(null);
     const [editingGoal, setEditingGoal] = useState<{ metricKey: string; label: string; type?: 'number' | 'duration' | 'pace' } | null>(null);
     const [pushStatus, setPushStatus] = useState<'idle' | 'pushing' | 'success' | 'error'>('idle');
+
+    // Persist workoutType to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('baselineWorkoutType', workoutType);
+    }, [workoutType]);
 
     // Handle pushing generated workout to Hevy
     const handlePushToHevy = async (workout: GeneratedLiftingWorkout) => {

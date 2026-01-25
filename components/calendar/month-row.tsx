@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useEffect, useRef } from 'react';
-import { eachDayOfInterval, endOfMonth, startOfMonth, format, differenceInDays, getDay, getDaysInMonth, addDays } from 'date-fns';
+import { useMemo, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { eachDayOfInterval, endOfMonth, startOfMonth, format, differenceInDays, getDay, getDaysInMonth, addDays, parseISO } from 'date-fns';
 import { useDraggable } from '@dnd-kit/core';
 import { DayCell } from './day-cell';
 import { cn } from '@/lib/utils';
@@ -245,6 +246,12 @@ function DraggableEvent({
     justDragged: boolean;
     onOpenModal: () => void;
 }) {
+    const [showSticky, setShowSticky] = useState(false);
+    const [rect, setRect] = useState<DOMRect | null>(null);
+    const openTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const elementRef = useRef<HTMLDivElement>(null);
+
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: event.id,
     });
@@ -258,70 +265,193 @@ function DraggableEvent({
     });
 
     const cat = CALENDAR_CATEGORIES[event.category];
-
     const leftPercent = event.startIndex * dayWidth;
     const widthPercent = event.columnSpan * dayWidth;
 
-    return (
-        <div
-            ref={setNodeRef}
-            {...listeners}
-            {...attributes}
-            data-event
-            data-event-id={event.id}
-            className={cn(
-                "absolute h-4 flex items-center px-1.5 text-[10px] font-medium group/event pointer-events-auto",
-                isDragging ? "cursor-grabbing opacity-50" : "cursor-grab",
-                "rounded shadow-sm hover:shadow-md hover:z-30",
-                isResizing && "opacity-75",
-                "transition-[box-shadow]",
-                cat.color,
-                cat.textColor,
-            )}
-            style={{
-                left: `${leftPercent}%`,
-                width: `${widthPercent}%`,
-                top: `${32 + event.lane * 20}px`,
-                userSelect: 'none',
-                touchAction: 'none',
-            }}
-            title={`${event.title} (${format(new Date(event.start_date), 'MMM d')} - ${format(new Date(event.end_date), 'MMM d')})`}
-            onClick={(e) => {
-                e.stopPropagation();
-                if (!isDragging && !isResizing && !justDragged) {
-                    onOpenModal();
+
+    const hasNotes = !!event.notes?.trim();
+
+    const handleMouseEnter = () => {
+        if (isDragging || isResizing || !hasNotes) return;
+
+        // Cancel any pending close action (e.g. moving from sticky back to event)
+        if (closeTimeoutRef.current) {
+            clearTimeout(closeTimeoutRef.current);
+            closeTimeoutRef.current = null;
+        }
+
+        // If already shown, keep it shown
+        if (showSticky) return;
+
+        // Schedule open
+        if (!openTimeoutRef.current) {
+            openTimeoutRef.current = setTimeout(() => {
+                if (elementRef.current) {
+                    setRect(elementRef.current.getBoundingClientRect());
+                    setShowSticky(true);
                 }
-            }}
-        >
-            {/* Start Resize Handle */}
-            <div
-                ref={setStartRef}
-                {...startListeners}
-                {...startAttrs}
-                data-resize-handle="start"
-                className={cn(
-                    "absolute left-0 top-0 bottom-0 w-2 bg-blue-400 hover:bg-blue-600 cursor-col-resize transition-opacity",
-                    (isResizing || isDragging) ? "opacity-100" : "opacity-0 group-hover/event:opacity-100"
-                )}
-                style={{ touchAction: 'none' }}
-                onClick={(e) => e.stopPropagation()}
-            />
+            }, 300); // 300ms delay before showing to avoid accidental triggers
+        }
+    };
 
-            <span className="truncate flex-1 mx-1">{event.title}</span>
+    const handleMouseLeave = () => {
+        // Cancel pending open
+        if (openTimeoutRef.current) {
+            clearTimeout(openTimeoutRef.current);
+            openTimeoutRef.current = null;
+        }
 
-            {/* End Resize Handle */}
+        // Schedule close
+        if (showSticky) {
+            closeTimeoutRef.current = setTimeout(() => {
+                setShowSticky(false);
+            }, 300); // Grace period to move to the sticky note
+        }
+    };
+
+    // Helper for touch devices
+    const isTouchDevice = () => {
+        return (('ontouchstart' in window) ||
+            (navigator.maxTouchPoints > 0));
+    };
+
+    return (
+        <>
             <div
-                ref={setEndRef}
-                {...endListeners}
-                {...endAttrs}
-                data-resize-handle="end"
+                ref={(node) => {
+                    // Combine refs
+                    setNodeRef(node);
+                    // @ts-ignore
+                    elementRef.current = node;
+                }}
+                {...listeners}
+                {...attributes}
+                data-event
+                data-event-id={event.id}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
                 className={cn(
-                    "absolute right-0 top-0 bottom-0 w-2 bg-blue-400 hover:bg-blue-600 cursor-col-resize transition-opacity",
-                    (isResizing || isDragging) ? "opacity-100" : "opacity-0 group-hover/event:opacity-100"
+                    "absolute h-4 flex items-center px-1.5 text-[10px] font-medium group/event pointer-events-auto",
+                    isDragging ? "cursor-grabbing opacity-50" : "cursor-grab",
+                    "rounded shadow-sm hover:shadow-md hover:z-30",
+                    isResizing && "opacity-75",
+                    "transition-[box-shadow]",
+                    cat.color,
+                    cat.textColor,
+                    showSticky && "opacity-0" // Hide original when sticky is shown to prevent double rendering/overlap
                 )}
-                style={{ touchAction: 'none' }}
-                onClick={(e) => e.stopPropagation()}
-            />
-        </div>
+                style={{
+                    left: `${leftPercent}%`,
+                    width: `${widthPercent}%`,
+                    top: `${32 + event.lane * 20}px`,
+                    userSelect: 'none',
+                    touchAction: 'none',
+                }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isDragging && !isResizing && !justDragged) {
+                        onOpenModal();
+                    }
+                }}
+            >
+                {/* Start Resize Handle */}
+                <div
+                    ref={setStartRef}
+                    {...startListeners}
+                    {...startAttrs}
+                    data-resize-handle="start"
+                    className={cn(
+                        "absolute left-0 top-0 bottom-0 w-2 bg-blue-400 hover:bg-blue-600 cursor-col-resize transition-opacity",
+                        (isResizing || isDragging) ? "opacity-100" : "opacity-0 group-hover/event:opacity-100"
+                    )}
+                    style={{ touchAction: 'none' }}
+                    onClick={(e) => e.stopPropagation()}
+                />
+
+                <span className="truncate flex-1 mx-1">{event.title}</span>
+
+                {/* Notes Indicator (icon) if notes exist */}
+                {hasNotes && (
+                    <span className="flex-shrink-0 opacity-70 ml-0.5">
+                        <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 5H21V19H3V5ZM3 3C1.89543 3 1 3.89543 1 5V19C1 20.1046 1.89543 21 3 21H21C22.1046 21 23 20.1046 23 19V5C23 3.89543 22.1046 3 21 3H3ZM8 8H16V10H8V8ZM8 12H16V14H8V12Z" />
+                        </svg>
+                    </span>
+                )}
+
+                {/* End Resize Handle */}
+                <div
+                    ref={setEndRef}
+                    {...endListeners}
+                    {...endAttrs}
+                    data-resize-handle="end"
+                    className={cn(
+                        "absolute right-0 top-0 bottom-0 w-2 bg-blue-400 hover:bg-blue-600 cursor-col-resize transition-opacity",
+                        (isResizing || isDragging) ? "opacity-100" : "opacity-0 group-hover/event:opacity-100"
+                    )}
+                    style={{ touchAction: 'none' }}
+                    onClick={(e) => e.stopPropagation()}
+                />
+            </div>
+
+            {/* Sticky Note Portal */}
+            {showSticky && rect && createPortal(
+                <div
+                    className="fixed z-[9999]" // Removed animation to mitigate overlap ghosts
+                    style={{
+                        top: rect.top,
+                        left: rect.left,
+                        width: Math.max(rect.width, 220), // Min width for readability
+                        // If it goes offscreen to the right, we might need to adjust logic, but sticking to left for now.
+                        // Ideally we check viewport bounds.
+                    }}
+                    onMouseEnter={() => {
+                        // Keep open when hovering the sticky itself
+                        if (closeTimeoutRef.current) {
+                            clearTimeout(closeTimeoutRef.current);
+                            closeTimeoutRef.current = null;
+                        }
+                    }}
+                    onMouseLeave={handleMouseLeave}
+                    onClick={(e) => {
+                        e.stopPropagation(); // Prevent event click behind it
+                        setShowSticky(false);
+                        onOpenModal();
+                    }}
+                >
+                    <div className={cn(
+                        "flex flex-col rounded-md shadow-2xl overflow-hidden cursor-pointer border",
+                        "bg-white dark:bg-zinc-900 border-gray-200 dark:border-gray-800", // Solid background
+                        cat.borderColor // Use category border color
+                    )}>
+                        {/* Header (looks like the event) */}
+                        <div className={cn(
+                            "h-5 flex items-center px-2 text-[10px] font-medium border-b border-black/5",
+                            cat.textColor
+                        )}>
+                            <span className="flex-1 truncate">{event.title}</span>
+                            <span className="opacity-70 text-[9px] ml-2">
+                                {event.start_date === event.end_date
+                                    ? format(new Date(event.start_date), 'MMM d')
+                                    : `${format(new Date(event.start_date), 'MMM d')} - ${format(new Date(event.end_date), 'MMM d')}`
+                                }
+                            </span>
+                        </div>
+
+                        {/* Notes Body */}
+                        <div className={cn(
+                            "p-2 text-xs leading-relaxed whitespace-pre-wrap",
+                            // Use a slightly different background or text color for contrast if needed
+                            // But usually staying in theme is nice. 
+                            // If the event color is dark, text is white. If light, text is black.
+                            cat.textColor
+                        )}>
+                            {event.notes}
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+        </>
     );
 }
