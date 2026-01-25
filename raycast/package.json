@@ -10,13 +10,15 @@
       "name": "add-action",
       "title": "Add Action",
       "description": "Create a new action",
-      "mode": "view"
+      "mode": "view",
+      "path": "dist/add-action.js"
     },
     {
       "name": "add-belief",
       "title": "Add Belief",
       "description": "Create a new belief",
-      "mode": "view"
+      "mode": "view",
+      "path": "dist/add-belief.js"
     }
   ],
   "preferences": [
