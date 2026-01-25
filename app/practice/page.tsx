@@ -220,10 +220,7 @@ export default function PracticePage() {
                                 streak={data.streak}
                                 lastVision={data.lastVision}
                                 beliefs={data.beliefs}
-                                onSave={async (practiceData) => {
-                                    await handleSavePractice(practiceData);
-                                    setIsPracticeModalOpen(false);
-                                }}
+                                onSave={handleSavePractice}
                                 onComplete={async (practiceData) => {
                                     await handleCompletePractice(practiceData);
                                     setIsPracticeModalOpen(false);

@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Bet, Belief, BoldTake, UserSettings } from '@/lib/practice/types';
 import { UPSIDE_OPTIONS } from '@/lib/practice/types';
 import { calculateBetScore, parseTimelineYears } from '@/lib/practice/bet-scoring';
@@ -58,6 +60,60 @@ const ACTION_STATUS_GUIDANCE = {
     }
 };
 
+interface DragHandleProps {
+    attributes: Record<string, unknown>;
+    listeners: Record<string, unknown>;
+}
+
+function DragHandle({ attributes, listeners }: DragHandleProps) {
+    return (
+        <button
+            type="button"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 text-gray-500 opacity-0 transition group-hover:opacity-100 hover:text-gray-700 dark:hover:text-gray-200"
+            aria-label="Reorder"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            {...attributes}
+            {...listeners}
+        >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="8" cy="6" r="1.5" />
+                <circle cx="8" cy="12" r="1.5" />
+                <circle cx="8" cy="18" r="1.5" />
+                <circle cx="16" cy="6" r="1.5" />
+                <circle cx="16" cy="12" r="1.5" />
+                <circle cx="16" cy="18" r="1.5" />
+            </svg>
+        </button>
+    );
+}
+
+interface SortableRowProps {
+    id: string;
+    children: (props: DragHandleProps) => React.ReactNode;
+    className?: string;
+    rowProps?: React.HTMLAttributes<HTMLTableRowElement>;
+}
+
+function SortableRow({ id, children, className, rowProps }: SortableRowProps) {
+    const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id });
+    const style = {
+        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+        transition,
+    };
+
+    return (
+        <tr
+            ref={setNodeRef}
+            style={style}
+            className={`group ${isDragging ? 'bg-indigo-50/40 dark:bg-indigo-900/20' : ''} ${className ?? ''}`}
+            {...rowProps}
+        >
+            {children({ attributes, listeners })}
+        </tr>
+    );
+}
+
 interface BetsTableProps {
     bets: Bet[];
     beliefs: Belief[];
@@ -82,6 +138,15 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
     const [detailFilter, setDetailFilter] = useState<'all' | 'beliefs' | 'actions'>('all');
     const [hoveredActionId, setHoveredActionId] = useState<string | null>(null);
     const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+    const [betOrder, setBetOrder] = useState<string[]>([]);
+    const [actionOrder, setActionOrder] = useState<Record<string, string[]>>({});
+    const [isBeliefFormOpen, setIsBeliefFormOpen] = useState(false);
+    const [beliefText, setBeliefText] = useState('');
+    const [beliefStatus, setBeliefStatus] = useState<'untested' | 'testing' | 'proven' | 'disproven'>('untested');
+    const [beliefBetId, setBeliefBetId] = useState<string | null>(null);
+    const [isBeliefSaving, setIsBeliefSaving] = useState(false);
+
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
     // Close add menu when clicking outside
     useEffect(() => {
@@ -106,6 +171,50 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
     const sortedBets = useMemo(() => {
         return [...bets].map(bet => ({ ...bet, bet_score: bet.bet_score ?? calculateBetScore(bet) }));
     }, [bets]);
+
+    useEffect(() => {
+        setBetOrder(sortedBets.map(bet => bet.id));
+    }, [sortedBets]);
+
+    useEffect(() => {
+        setActionOrder((prev) => {
+            const next: Record<string, string[]> = {};
+            const groups = new Map<string, string[]>();
+
+            const sortedTakes = [...boldTakes].sort((a, b) => {
+                const aOrder = a.sort_order ?? 0;
+                const bOrder = b.sort_order ?? 0;
+                if (aOrder !== bOrder) return aOrder - bOrder;
+                const aTime = a.created_at ? Date.parse(a.created_at) : 0;
+                const bTime = b.created_at ? Date.parse(b.created_at) : 0;
+                return aTime - bTime;
+            });
+
+            const betsById = new Map(sortedBets.map((bet) => [bet.id, bet]));
+
+            sortedTakes.forEach((take) => {
+                if (!take.bet_id || !betsById.has(take.bet_id)) return;
+                const groupKey = take.belief_id
+                    ? `belief-${take.belief_id}`
+                    : `unlinked-${take.bet_id}`;
+                const list = groups.get(groupKey) || [];
+                list.push(take.id);
+                groups.set(groupKey, list);
+            });
+
+            groups.forEach((ids, key) => {
+                const existing = prev[key] || [];
+                const existingSet = new Set(existing);
+                const merged = existing.filter(id => ids.includes(id));
+                ids.forEach((id) => {
+                    if (!existingSet.has(id)) merged.push(id);
+                });
+                next[key] = merged;
+            });
+
+            return next;
+        });
+    }, [boldTakes, sortedBets]);
 
     const toggleBet = (betId: string) => {
         const newExpanded = new Set(expandedBets);
@@ -148,6 +257,114 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
             console.error('Error updating field:', error);
         }
     }, [editValue, onRefresh]);
+
+    const handleUpdateBetStatus = useCallback(async (betId: string, status: Bet['status']) => {
+        try {
+            const res = await fetch(`/api/practice/bets/${betId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status }),
+            });
+            if (res.ok) {
+                onRefresh?.();
+            }
+        } catch (error) {
+            console.error('Error updating bet status:', error);
+        }
+    }, [onRefresh]);
+
+    const handleCreateBelief = useCallback(async () => {
+        if (!beliefText.trim()) return;
+        setIsBeliefSaving(true);
+        try {
+            const res = await fetch('/api/practice/beliefs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    belief: beliefText.trim(),
+                    status: beliefStatus,
+                    bet_id: beliefBetId,
+                }),
+            });
+            if (res.ok) {
+                setBeliefText('');
+                setBeliefStatus('untested');
+                setBeliefBetId(null);
+                setIsBeliefFormOpen(false);
+                onRefresh?.();
+            }
+        } catch (error) {
+            console.error('Error creating belief:', error);
+        } finally {
+            setIsBeliefSaving(false);
+        }
+    }, [beliefText, beliefStatus, beliefBetId, onRefresh]);
+
+    const orderedBets = useMemo(() => {
+        const betMap = new Map(sortedBets.map((bet) => [bet.id, bet]));
+        return betOrder
+            .map((id) => betMap.get(id))
+            .filter((bet): bet is Bet => Boolean(bet));
+    }, [betOrder, sortedBets]);
+
+    const getOrderedActions = useCallback((actions: BoldTake[], groupKey: string) => {
+        const order = actionOrder[groupKey];
+        if (!order) return actions;
+        const actionMap = new Map(actions.map((action) => [action.id, action]));
+        const ordered = order
+            .map((id) => actionMap.get(id))
+            .filter((action): action is BoldTake => Boolean(action));
+        const missing = actions.filter((action) => !order.includes(action.id));
+        return [...ordered, ...missing];
+    }, [actionOrder]);
+
+    const handleBetDragEnd = useCallback(async (event: { active: { id: string }; over: { id: string } | null }) => {
+        if (!event.over || event.active.id === event.over.id) return;
+        const activeIndex = betOrder.indexOf(event.active.id);
+        const overIndex = betOrder.indexOf(event.over.id);
+        if (activeIndex === -1 || overIndex === -1) return;
+        const newOrder = arrayMove(betOrder, activeIndex, overIndex);
+        setBetOrder(newOrder);
+
+        try {
+            await fetch('/api/practice/bets/reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order: newOrder }),
+            });
+            onRefresh?.();
+        } catch (error) {
+            console.error('Error reordering bets:', error);
+        }
+    }, [betOrder, onRefresh]);
+
+    const handleActionDragEnd = useCallback(async (
+        event: { active: { id: string }; over: { id: string } | null },
+        groupKey: string
+    ) => {
+        if (!event.over || event.active.id === event.over.id) return;
+        const currentOrder = actionOrder[groupKey] || [];
+        const activeIndex = currentOrder.indexOf(event.active.id);
+        const overIndex = currentOrder.indexOf(event.over.id);
+        if (activeIndex === -1 || overIndex === -1) return;
+        const newOrder = arrayMove(currentOrder, activeIndex, overIndex);
+
+        setActionOrder((prev) => ({
+            ...prev,
+            [groupKey]: newOrder,
+        }));
+
+        try {
+            await fetch('/api/practice/bold-takes/reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order: newOrder }),
+            });
+            onRefresh?.();
+        } catch (error) {
+            console.error('Error reordering actions:', error);
+        }
+    }, [actionOrder, onRefresh]);
 
     const handleUpdateBeliefStatus = useCallback(async (beliefId: string, newStatus: string) => {
         try {
@@ -333,12 +550,6 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
         }
     }, [onRefresh]);
 
-    // Status styles
-    const statusStyles: Record<string, string> = {
-        active: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-400/30',
-        paused: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 ring-1 ring-amber-400/30',
-        closed: 'bg-slate-500/10 text-slate-500 dark:text-slate-400 ring-1 ring-slate-400/30',
-    };
 
     // Confidence color (0-100 scale)
     const getConfidenceColor = (confidence: number) => {
@@ -347,31 +558,6 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
         return 'text-red-500';
     };
 
-    // Status badge class helper
-    const getStatusBadgeClass = (status: string) => {
-        switch (status) {
-            case 'proven':
-                return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
-            case 'testing':
-                return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400';
-            case 'disproven':
-                return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
-            case 'active':
-                return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
-            case 'done':
-                return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
-            case 'paused':
-                return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400';
-            case 'committed':
-                return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400';
-            case 'skipped':
-                return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
-            case 'closed':
-                return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400';
-            default:
-                return 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400';
-        }
-    };
 
     return (
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
@@ -498,6 +684,15 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                     >
                                         New Bet
                                     </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsBeliefFormOpen(true);
+                                            setIsAddMenuOpen(false);
+                                        }}
+                                        className="block w-full text-left px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                                    >
+                                        New Belief
+                                    </button>
                                     {!isCompleted && (
                                         <button
                                             onClick={() => {
@@ -516,7 +711,7 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                 </div>
             </div>
 
-            {sortedBets.length === 0 ? (
+            {orderedBets.length === 0 ? (
                 <div className="text-center py-12">
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">No bets yet. Create your first bet.</p>
                     <button
@@ -540,6 +735,9 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                 <th className="px-5 py-3 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[90px]">
                                     Confidence
                                 </th>
+                                <th className="px-5 py-3 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[90px]">
+                                    Status
+                                </th>
                                 <th className="px-5 py-3 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[80px]">
                                     Upside
                                 </th>
@@ -549,15 +747,14 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                 <th className="px-5 py-3 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[90px]">
                                     Downside
                                 </th>
-                                <th className="px-5 py-3 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[70px]">
-                                    Status
-                                </th>
                                 <th className="px-5 py-3 text-right text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[60px]">
                                 </th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {sortedBets.map((bet) => {
+                        <DndContext sensors={sensors} onDragEnd={handleBetDragEnd}>
+                            <SortableContext items={betOrder} strategy={verticalListSortingStrategy}>
+                                <tbody>
+                                    {orderedBets.map((bet) => {
                                 const isExpanded = expandedBets.has(bet.id);
                                 const linkedBeliefs = beliefs
                                     .filter(b => b.bet_id === bet.id)
@@ -570,12 +767,12 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                 const linkedTakes = boldTakes
                                     .filter(t => t.bet_id === bet.id)
                                     .sort((a, b) => {
-                                        const aDate = a.date ? Date.parse(a.date) : 0;
-                                        const bDate = b.date ? Date.parse(b.date) : 0;
-                                        if (aDate !== bDate) return bDate - aDate;
+                                        const aOrder = a.sort_order ?? 0;
+                                        const bOrder = b.sort_order ?? 0;
+                                        if (aOrder !== bOrder) return aOrder - bOrder;
                                         const aTime = a.created_at ? Date.parse(a.created_at) : 0;
                                         const bTime = b.created_at ? Date.parse(b.created_at) : 0;
-                                        if (aTime !== bTime) return bTime - aTime;
+                                        if (aTime !== bTime) return aTime - bTime;
                                         return a.id.localeCompare(b.id);
                                     });
                                 const showBeliefs = detailFilter !== 'actions';
@@ -606,33 +803,35 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                 return (
                                     <React.Fragment key={bet.id}>
                                         {/* Main Bet Row */}
-                                        <tr
-                                            key={bet.id}
+                                        <SortableRow
+                                            id={bet.id}
                                             className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors cursor-pointer"
-                                            onClick={() => toggleBet(bet.id)}
                                         >
-                                            <td className="px-6 py-3">
-                                                <div className="flex items-center gap-2">
-                                                    <svg
-                                                        className={`w-3 h-3 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-0' : '-rotate-90'}`}
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        viewBox="0 0 24 24"
-                                                    >
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                    </svg>
-                                                    <div>
-                                                        <div className="text-xs font-medium text-gray-900 dark:text-gray-100">
-                                                            {bet.name}
-                                                        </div>
-                                                        {bet.description && (
-                                                            <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate max-w-[250px]">
-                                                                {bet.description}
+                                            {({ attributes, listeners }) => (
+                                                <>
+                                                    <td className="px-6 py-3" onClick={() => toggleBet(bet.id)}>
+                                                        <div className="flex items-center gap-2">
+                                                            <DragHandle attributes={attributes} listeners={listeners} />
+                                                            <svg
+                                                                className={`w-3 h-3 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-0' : '-rotate-90'}`}
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                viewBox="0 0 24 24"
+                                                            >
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                            <div>
+                                                                <div className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                                                                    {bet.name}
+                                                                </div>
+                                                                {bet.description && (
+                                                                    <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate max-w-[250px]">
+                                                                        {bet.description}
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </td>
+                                                        </div>
+                                                    </td>
                                             {/* Timeline with Rich Tooltip */}
                                             <td className="px-5 py-3 text-center text-xs text-gray-700 dark:text-gray-300">
                                                 {(() => {
@@ -703,6 +902,18 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                 ) : (
                                                     <span>-</span>
                                                 )}
+                                            </td>
+                                            {/* Status */}
+                                            <td className="px-5 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                                <select
+                                                    value={bet.status}
+                                                    onChange={(e) => handleUpdateBetStatus(bet.id, e.target.value as Bet['status'])}
+                                                    className="h-7 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs text-gray-700 dark:text-gray-200"
+                                                >
+                                                    <option value="active">Active</option>
+                                                    <option value="paused">Paused</option>
+                                                    <option value="closed">Closed</option>
+                                                </select>
                                             </td>
                                             {/* Upside - Inline Editable with Rich Tooltip */}
                                             <td
@@ -811,11 +1022,6 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                     );
                                                 })()}
                                             </td>
-                                            <td className="px-5 py-3 text-center">
-                                                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded-full ${statusStyles[bet.status]}`}>
-                                                    {bet.status}
-                                                </span>
-                                            </td>
                                             <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                                                 <button
                                                     onClick={() => setEditingBet(bet)}
@@ -827,13 +1033,20 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                     </svg>
                                                 </button>
                                             </td>
-                                        </tr>
+                                                </>
+                                            )}
+                                        </SortableRow>
 
                                         {/* Expanded Details - Column-Aligned Nested Rows */}
                                         {isExpanded && (
                                             <>
                                                 {linkedBeliefs.map((belief) => {
-                                                    const beliefActions = linkedTakes.filter(t => t.belief_id === belief.id);
+                                                    const beliefGroupKey = `belief-${belief.id}`;
+                                                    const beliefActions = getOrderedActions(
+                                                        linkedTakes.filter(t => t.belief_id === belief.id),
+                                                        beliefGroupKey
+                                                    );
+                                                    const beliefActionIds = beliefActions.map((take) => take.id);
                                                     return (
                                                         <React.Fragment key={`belief-${belief.id}`}>
                                                             {/* Belief Row */}
@@ -929,10 +1142,6 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                             </button>
                                                                         )}
                                                                     </td>
-                                                                    <td className="px-5 py-2"></td>
-                                                                    <td className="px-5 py-2"></td>
-                                                                    <td className="px-5 py-2"></td>
-                                                                    <td className="px-5 py-2"></td>
                                                                     <td className="px-5 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                                                                         <Tooltip content={
                                                                             <div className="space-y-2 max-w-xs">
@@ -953,7 +1162,7 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                             <select
                                                                                 value={belief.status}
                                                                                 onChange={(e) => handleUpdateBeliefStatus(belief.id, e.target.value)}
-                                                                                className="text-[10px] px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 cursor-help"
+                                                                                className="h-7 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs text-gray-700 dark:text-gray-200 cursor-help"
                                                                             >
                                                                                 <option value="untested">Untested</option>
                                                                                 <option value="testing">Testing</option>
@@ -963,47 +1172,63 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                         </Tooltip>
                                                                     </td>
                                                                     <td className="px-5 py-2"></td>
+                                                                    <td className="px-5 py-2"></td>
+                                                                    <td className="px-5 py-2"></td>
+                                                                    <td className="px-5 py-2"></td>
+                                                                    <td className="px-5 py-2"></td>
                                                                 </tr>
                                                             )}
 
                                                             {/* Action Rows (nested under belief) */}
-                                                            {showActions && beliefActions.map(take => (
-                                                                <tr
-                                                                    key={`action-${take.id}`}
-                                                                    className="border-b border-gray-100 dark:border-gray-800/50 bg-green-50/20 dark:bg-green-900/5"
-                                                                    onMouseEnter={() => setHoveredActionId(take.id)}
-                                                                    onMouseLeave={() => setHoveredActionId(null)}
+                                                            {showActions && beliefActions.length > 0 && (
+                                                                <DndContext
+                                                                    sensors={sensors}
+                                                                    onDragEnd={(event) => handleActionDragEnd(event, beliefGroupKey)}
                                                                 >
-                                                                    <td className="px-6 py-2">
-                                                                        <div className="flex items-center gap-2 pl-10">
-                                                                            <span className="text-[10px] px-1.5 py-0.5 bg-green-200 dark:bg-green-700 rounded font-medium">A</span>
-                                                                        <div className="min-w-0 flex-1">
-                                                                            {editingField?.betId === take.id && editingField?.field === `action-description-${take.id}` ? (
-                                                                                <input
-                                                                                    autoFocus
-                                                                                    value={editValue}
-                                                                                    onChange={(e) => setEditValue(e.target.value)}
-                                                                                    onBlur={() => handleUpdateActionDescription(take.id, editValue)}
-                                                                                    onKeyDown={(e) => {
-                                                                                        if (e.key === 'Enter') handleUpdateActionDescription(take.id, editValue);
-                                                                                        if (e.key === 'Escape') setEditingField(null);
-                                                                                    }}
-                                                                                    className="w-full px-2 py-0.5 text-xs border border-green-300 dark:border-green-700 rounded bg-white dark:bg-gray-900"
-                                                                                />
-                                                                            ) : (
-                                                                                <button
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        handleStartEdit(take.id, `action-description-${take.id}`, take.description);
-                                                                                    }}
-                                                                                    className="w-full text-left text-xs text-gray-900 dark:text-gray-100 hover:text-green-600 dark:hover:text-green-300"
-                                                                                >
-                                                                                    {take.description}
-                                                                                </button>
-                                                                            )}
-                                                                        </div>
-                                                                        </div>
-                                                                    </td>
+                                                                    <SortableContext items={beliefActionIds} strategy={verticalListSortingStrategy}>
+                                                                        {beliefActions.map(take => (
+                                                                            <SortableRow
+                                                                                key={`action-${take.id}`}
+                                                                                id={take.id}
+                                                                                className="border-b border-gray-100 dark:border-gray-800/50 bg-green-50/20 dark:bg-green-900/5"
+                                                                                rowProps={{
+                                                                                    onMouseEnter: () => setHoveredActionId(take.id),
+                                                                                    onMouseLeave: () => setHoveredActionId(null),
+                                                                                }}
+                                                                            >
+                                                                                {({ attributes, listeners }) => (
+                                                                                    <>
+                                                                                        <td className="px-6 py-2">
+                                                                                            <div className="flex items-center gap-2 pl-10">
+                                                                                                <DragHandle attributes={attributes} listeners={listeners} />
+                                                                                                <span className="text-[10px] px-1.5 py-0.5 bg-green-200 dark:bg-green-700 rounded font-medium">A</span>
+                                                                                                <div className="min-w-0 flex-1">
+                                                                                                    {editingField?.betId === take.id && editingField?.field === `action-description-${take.id}` ? (
+                                                                                                        <input
+                                                                                                            autoFocus
+                                                                                                            value={editValue}
+                                                                                                            onChange={(e) => setEditValue(e.target.value)}
+                                                                                                            onBlur={() => handleUpdateActionDescription(take.id, editValue)}
+                                                                                                            onKeyDown={(e) => {
+                                                                                                                if (e.key === 'Enter') handleUpdateActionDescription(take.id, editValue);
+                                                                                                                if (e.key === 'Escape') setEditingField(null);
+                                                                                                            }}
+                                                                                                            className="w-full px-2 py-0.5 text-xs border border-green-300 dark:border-green-700 rounded bg-white dark:bg-gray-900"
+                                                                                                        />
+                                                                                                    ) : (
+                                                                                                        <button
+                                                                                                            onClick={(e) => {
+                                                                                                                e.stopPropagation();
+                                                                                                                handleStartEdit(take.id, `action-description-${take.id}`, take.description);
+                                                                                                            }}
+                                                                                                            className="w-full text-left text-xs text-gray-900 dark:text-gray-100 hover:text-green-600 dark:hover:text-green-300"
+                                                                                                        >
+                                                                                                            {take.description}
+                                                                                                        </button>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </td>
                                                                     <td className="px-5 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                                                                         {editingField?.betId === take.id && editingField?.field === `action-duration-${take.id}` ? (
                                                                             <input
@@ -1085,10 +1310,6 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                             </button>
                                                                         )}
                                                                     </td>
-                                                                    <td className="px-5 py-2"></td>
-                                                                    <td className="px-5 py-2"></td>
-                                                                    <td className="px-5 py-2"></td>
-                                                                    <td className="px-5 py-2"></td>
                                                                     <td className="px-5 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                                                                         <Tooltip content={
                                                                             <div className="space-y-2 max-w-xs">
@@ -1109,7 +1330,7 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                             <select
                                                                                 value={take.status}
                                                                                 onChange={(e) => handleUpdateActionStatus(take.id, e.target.value)}
-                                                                                className="text-[10px] px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 cursor-help"
+                                                                                className="h-7 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs text-gray-700 dark:text-gray-200 cursor-help"
                                                                             >
                                                                                 <option value="committed">Committed</option>
                                                                                 <option value="done">Done</option>
@@ -1118,50 +1339,81 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                         </Tooltip>
                                                                     </td>
                                                                     <td className="px-5 py-2"></td>
-                                                                </tr>
-                                                            ))}
+                                                                    <td className="px-5 py-2"></td>
+                                                                    <td className="px-5 py-2"></td>
+                                                                    <td className="px-5 py-2"></td>
+                                                                    <td className="px-5 py-2"></td>
+                                                                                    </>
+                                                                                )}
+                                                                            </SortableRow>
+                                                                        ))}
+                                                                    </SortableContext>
+                                                                </DndContext>
+                                                            )}
                                                         </React.Fragment>
                                                     );
                                                 })}
 
                                                 {/* Actions without linked beliefs */}
-                                                {showActions && boldTakes.filter(t => t.bet_id === bet.id && !t.belief_id).map(take => (
-                                                    <tr
-                                                        key={`unlinked-action-${take.id}`}
-                                                        className="border-b border-gray-100 dark:border-gray-800/50 bg-green-50/20 dark:bg-green-900/5"
-                                                        onMouseEnter={() => setHoveredActionId(take.id)}
-                                                        onMouseLeave={() => setHoveredActionId(null)}
-                                                    >
-                                                        <td className="px-4 py-1">
-                                                            <div className="flex items-center gap-2 pl-5">
-                                                                <span className="text-[10px] px-1.5 py-0.5 bg-green-200 dark:bg-green-700 rounded font-medium">A</span>
-                                                                <div className="min-w-0 flex-1">
-                                                                    {editingField?.betId === take.id && editingField?.field === `action-description-${take.id}` ? (
-                                                                        <input
-                                                                            autoFocus
-                                                                            value={editValue}
-                                                                            onChange={(e) => setEditValue(e.target.value)}
-                                                                            onBlur={() => handleUpdateActionDescription(take.id, editValue)}
-                                                                            onKeyDown={(e) => {
-                                                                                if (e.key === 'Enter') handleUpdateActionDescription(take.id, editValue);
-                                                                                if (e.key === 'Escape') setEditingField(null);
-                                                                            }}
-                                                                            className="w-full px-2 py-0.5 text-xs border border-green-300 dark:border-green-700 rounded bg-white dark:bg-gray-900"
-                                                                        />
-                                                                    ) : (
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleStartEdit(take.id, `action-description-${take.id}`, take.description);
-                                                                            }}
-                                                                            className="w-full text-left text-xs text-gray-900 dark:text-gray-100 hover:text-green-600 dark:hover:text-green-300"
-                                                                        >
-                                                                            {take.description}
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </td>
+                                                {(() => {
+                                                    const unlinkedGroupKey = `unlinked-${bet.id}`;
+                                                    const unlinkedActions = getOrderedActions(
+                                                        linkedTakes.filter(t => t.bet_id === bet.id && !t.belief_id),
+                                                        unlinkedGroupKey
+                                                    );
+                                                    const unlinkedActionIds = unlinkedActions.map((take) => take.id);
+
+                                                    if (!showActions || unlinkedActions.length === 0) return null;
+
+                                                    return (
+                                                        <DndContext
+                                                            sensors={sensors}
+                                                            onDragEnd={(event) => handleActionDragEnd(event, unlinkedGroupKey)}
+                                                        >
+                                                            <SortableContext items={unlinkedActionIds} strategy={verticalListSortingStrategy}>
+                                                                {unlinkedActions.map(take => (
+                                                                    <SortableRow
+                                                                        key={`unlinked-action-${take.id}`}
+                                                                        id={take.id}
+                                                                        className="border-b border-gray-100 dark:border-gray-800/50 bg-green-50/20 dark:bg-green-900/5"
+                                                                        rowProps={{
+                                                                            onMouseEnter: () => setHoveredActionId(take.id),
+                                                                            onMouseLeave: () => setHoveredActionId(null),
+                                                                        }}
+                                                                    >
+                                                                        {({ attributes, listeners }) => (
+                                                                            <>
+                                                                                <td className="px-4 py-1">
+                                                                                    <div className="flex items-center gap-2 pl-5">
+                                                                                        <DragHandle attributes={attributes} listeners={listeners} />
+                                                                                        <span className="text-[10px] px-1.5 py-0.5 bg-green-200 dark:bg-green-700 rounded font-medium">A</span>
+                                                                                        <div className="min-w-0 flex-1">
+                                                                                            {editingField?.betId === take.id && editingField?.field === `action-description-${take.id}` ? (
+                                                                                                <input
+                                                                                                    autoFocus
+                                                                                                    value={editValue}
+                                                                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                                                                    onBlur={() => handleUpdateActionDescription(take.id, editValue)}
+                                                                                                    onKeyDown={(e) => {
+                                                                                                        if (e.key === 'Enter') handleUpdateActionDescription(take.id, editValue);
+                                                                                                        if (e.key === 'Escape') setEditingField(null);
+                                                                                                    }}
+                                                                                                    className="w-full px-2 py-0.5 text-xs border border-green-300 dark:border-green-700 rounded bg-white dark:bg-gray-900"
+                                                                                                />
+                                                                                            ) : (
+                                                                                                <button
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        handleStartEdit(take.id, `action-description-${take.id}`, take.description);
+                                                                                                    }}
+                                                                                                    className="w-full text-left text-xs text-gray-900 dark:text-gray-100 hover:text-green-600 dark:hover:text-green-300"
+                                                                                                >
+                                                                                                    {take.description}
+                                                                                                </button>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
                                                         <td className="px-5 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                                                             {editingField?.betId === take.id && editingField?.field === `action-duration-${take.id}` ? (
                                                                 <input
@@ -1243,10 +1495,6 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                 </button>
                                                             )}
                                                         </td>
-                                                        <td className="px-5 py-2"></td>
-                                                        <td className="px-5 py-2"></td>
-                                                        <td className="px-5 py-2"></td>
-                                                        <td className="px-5 py-2"></td>
                                                         <td className="px-5 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                                                             <Tooltip content={
                                                                 <div className="space-y-2 max-w-xs">
@@ -1267,7 +1515,7 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                 <select
                                                                     value={take.status}
                                                                     onChange={(e) => handleUpdateActionStatus(take.id, e.target.value)}
-                                                                    className="text-[10px] px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 cursor-help"
+                                                                    className="h-7 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs text-gray-700 dark:text-gray-200 cursor-help"
                                                                 >
                                                                     <option value="committed">Committed</option>
                                                                     <option value="done">Done</option>
@@ -1276,13 +1524,23 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                             </Tooltip>
                                                         </td>
                                                         <td className="px-5 py-2"></td>
-                                                    </tr>
-                                                ))}
+                                                        <td className="px-5 py-2"></td>
+                                                        <td className="px-5 py-2"></td>
+                                                        <td className="px-5 py-2"></td>
+                                                        <td className="px-5 py-2"></td>
+                                                                            </>
+                                                                        )}
+                                                                    </SortableRow>
+                                                                ))}
+                                                            </SortableContext>
+                                                        </DndContext>
+                                                    );
+                                                })()}
 
                                                 {/* Empty State */}
                                                 {showEmptyState && (
                                                     <tr className="border-b border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/10">
-                                                        <td colSpan={9} className="px-4 py-3 text-center">
+                                                        <td colSpan={8} className="px-4 py-3 text-center">
                                                             <p className="text-[10px] text-gray-500 dark:text-gray-400 italic">
                                                                 {detailFilter === 'beliefs'
                                                                     ? 'No beliefs linked yet'
@@ -1297,9 +1555,11 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                         )}
                                     </React.Fragment>
                                 );
-                            })}
+                                    })}
 
-                        </tbody>
+                                </tbody>
+                            </SortableContext>
+                        </DndContext>
                     </table>
                 </div>
             )}
@@ -1311,6 +1571,78 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                         <div className="p-6">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Create New Bet</h3>
                             <BetForm onSave={handleCreateBet} onCancel={() => setIsFormOpen(false)} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Create Belief Modal */}
+            {isBeliefFormOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 space-y-4">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create New Belief</h3>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Belief
+                                </label>
+                                <input
+                                    type="text"
+                                    value={beliefText}
+                                    onChange={(e) => setBeliefText(e.target.value)}
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                    placeholder="What do you believe?"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Link to Bet (optional)
+                                </label>
+                                <select
+                                    value={beliefBetId ?? ''}
+                                    onChange={(e) => setBeliefBetId(e.target.value || null)}
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                >
+                                    <option value="">Unlinked</option>
+                                    {orderedBets.map((bet) => (
+                                        <option key={bet.id} value={bet.id}>
+                                            {bet.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Status
+                                </label>
+                                <select
+                                    value={beliefStatus}
+                                    onChange={(e) => setBeliefStatus(e.target.value as typeof beliefStatus)}
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                >
+                                    <option value="untested">Untested</option>
+                                    <option value="testing">Testing</option>
+                                    <option value="proven">Proven</option>
+                                    <option value="disproven">Disproven</option>
+                                </select>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsBeliefFormOpen(false)}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleCreateBelief}
+                                    disabled={!beliefText.trim() || isBeliefSaving}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-lg transition-colors"
+                                >
+                                    {isBeliefSaving ? 'Saving...' : 'Create Belief'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

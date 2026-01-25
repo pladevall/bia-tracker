@@ -54,6 +54,7 @@ export interface Bet {
     bet_score?: number;            // Kelly-inspired ranking score
     calculated_timeline_years?: number; // Computed from sum of action durations
     computed_confidence?: number | null; // Auto-calculated confidence from weighted beliefs/actions
+    sort_order?: number | null;
 
     status: 'active' | 'paused' | 'closed';
     created_at: string;
@@ -77,6 +78,7 @@ export interface BoldTake {
     learning: string | null;
     duration_days?: number;        // Time commitment in days
     confidence?: number;           // 0-100% confidence in action success
+    sort_order?: number | null;
     created_at: string;
 }
 

@@ -14,7 +14,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const belief = await addBelief(body.belief, body.status, body.confidence);
+        const belief = await addBelief(body.belief, body.status, body.confidence, body.bet_id);
         return NextResponse.json(belief);
     } catch (error) {
         console.error('Error adding belief:', error);

@@ -115,6 +115,27 @@ export async function completePractice(entry: Partial<PracticeEntry> & { bet_id?
     // Set default duration_days to 30 days
     let boldTakeId: string | undefined;
     if (entry.bold_risk) {
+        let maxOrderQuery = supabase
+            .from('bold_takes')
+            .select('sort_order')
+            .order('sort_order', { ascending: false })
+            .limit(1);
+
+        if (entry.bet_id) {
+            maxOrderQuery = maxOrderQuery.eq('bet_id', entry.bet_id);
+        } else {
+            maxOrderQuery = maxOrderQuery.is('bet_id', null);
+        }
+
+        if (entry.belief_id) {
+            maxOrderQuery = maxOrderQuery.eq('belief_id', entry.belief_id);
+        } else {
+            maxOrderQuery = maxOrderQuery.is('belief_id', null);
+        }
+
+        const { data: maxActionOrder } = await maxOrderQuery.maybeSingle();
+        const nextActionOrder = (maxActionOrder?.sort_order ?? 0) + 1;
+
         const { data: boldTakeData } = await supabase
             .from('bold_takes')
             .insert({
@@ -125,6 +146,7 @@ export async function completePractice(entry: Partial<PracticeEntry> & { bet_id?
                 belief_id: entry.belief_id || null,
                 bet_id: entry.bet_id || null,
                 duration_days: 30,
+                sort_order: nextActionOrder,
             })
             .select('id')
             .single();
@@ -217,8 +239,8 @@ export async function getBoldTakes(limit = 50): Promise<BoldTake[]> {
     const { data } = await supabase
         .from('bold_takes')
         .select('*')
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false })
+        .order('sort_order', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true })
         .limit(limit);
 
     return data || [];
@@ -252,6 +274,20 @@ export async function deleteBoldTake(id: string): Promise<void> {
     if (error) throw error;
 }
 
+export async function reorderBoldTakes(order: string[]): Promise<void> {
+    const supabase = await createClient();
+    const now = new Date().toISOString();
+
+    await Promise.all(
+        order.map((id, index) =>
+            supabase
+                .from('bold_takes')
+                .update({ sort_order: index + 1, updated_at: now })
+                .eq('id', id)
+        )
+    );
+}
+
 // ============================================
 // Beliefs
 // ============================================
@@ -267,7 +303,12 @@ export async function getBeliefs(): Promise<Belief[]> {
     return data || [];
 }
 
-export async function addBelief(belief: string, status: BeliefStatus = 'untested', confidence?: number): Promise<Belief> {
+export async function addBelief(
+    belief: string,
+    status: BeliefStatus = 'untested',
+    confidence?: number,
+    betId?: string | null
+): Promise<Belief> {
     const supabase = await createClient();
 
     // Default confidence based on status if not provided
@@ -290,7 +331,7 @@ export async function addBelief(belief: string, status: BeliefStatus = 'untested
 
     const { data, error } = await supabase
         .from('practice_beliefs')
-        .insert({ belief, status, confidence: defaultConfidence })
+        .insert({ belief, status, confidence: defaultConfidence, bet_id: betId ?? null })
         .select()
         .single();
 
@@ -380,6 +421,7 @@ export async function getBets(): Promise<Bet[]> {
     const { data, error } = await supabase
         .from('bets')
         .select('*')
+        .order('sort_order', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true });
 
     if (error) {
@@ -425,7 +467,9 @@ export async function getBetWithRelations(id: string): Promise<{
     const [betResult, beliefsResult, takesResult] = await Promise.all([
         supabase.from('bets').select('*').eq('id', id).single(),
         supabase.from('practice_beliefs').select('*').eq('bet_id', id).order('created_at', { ascending: false }),
-        supabase.from('bold_takes').select('*').eq('bet_id', id).order('date', { ascending: false }),
+        supabase.from('bold_takes').select('*').eq('bet_id', id)
+            .order('sort_order', { ascending: true, nullsFirst: false })
+            .order('created_at', { ascending: true }),
     ]);
 
     if (betResult.error || !betResult.data) {
@@ -444,6 +488,14 @@ export async function createBet(bet: Omit<Bet, 'id' | 'created_at' | 'updated_at
     const supabase = await createClient();
     const now = new Date().toISOString();
 
+    const { data: maxOrder } = await supabase
+        .from('bets')
+        .select('sort_order')
+        .order('sort_order', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    const nextOrder = (maxOrder?.sort_order ?? 0) + 1;
+
     // Calculate the score
     const betWithScore = {
         ...bet,
@@ -454,6 +506,7 @@ export async function createBet(bet: Omit<Bet, 'id' | 'created_at' | 'updated_at
         .from('bets')
         .insert({
             ...betWithScore,
+            sort_order: nextOrder,
             created_at: now,
             updated_at: now,
         })
@@ -510,6 +563,20 @@ export async function deleteBet(id: string): Promise<void> {
         .eq('id', id);
 
     if (error) throw error;
+}
+
+export async function reorderBets(order: string[]): Promise<void> {
+    const supabase = await createClient();
+    const now = new Date().toISOString();
+
+    await Promise.all(
+        order.map((id, index) =>
+            supabase
+                .from('bets')
+                .update({ sort_order: index + 1, updated_at: now })
+                .eq('id', id)
+        )
+    );
 }
 
 export async function linkBeliefToBet(beliefId: string, betId: string | null): Promise<Belief> {
