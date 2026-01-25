@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import type { DraggableAttributes, SyntheticListenerMap } from '@dnd-kit/core';
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Bet, Belief, BoldTake, UserSettings } from '@/lib/practice/types';
 import { UPSIDE_OPTIONS } from '@/lib/practice/types';
@@ -61,8 +62,8 @@ const ACTION_STATUS_GUIDANCE = {
 };
 
 interface DragHandleProps {
-    attributes: Record<string, unknown>;
-    listeners: Record<string, unknown>;
+    attributes: DraggableAttributes;
+    listeners: SyntheticListenerMap | undefined;
 }
 
 function DragHandle({ attributes, listeners }: DragHandleProps) {
