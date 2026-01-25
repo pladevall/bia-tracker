@@ -70,7 +70,7 @@ function DragHandle({ attributes, listeners }: DragHandleProps) {
     return (
         <button
             type="button"
-            className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 text-gray-500 opacity-0 transition group-hover:opacity-100 hover:text-gray-700 dark:hover:text-gray-200"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 text-gray-500 opacity-0 transition group-hover:opacity-100 hover:text-gray-700 dark:hover:text-gray-200 cursor-grab active:cursor-grabbing"
             aria-label="Reorder"
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
@@ -811,8 +811,10 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                             {({ attributes, listeners }) => (
                                                 <>
                                                     <td className="px-6 py-3" onClick={() => toggleBet(bet.id)}>
-                                                        <div className="flex items-center gap-2">
-                                                            <DragHandle attributes={attributes} listeners={listeners} />
+                                                        <div className="relative flex items-center gap-2">
+                                                            <div className="absolute -left-7">
+                                                                <DragHandle attributes={attributes} listeners={listeners} />
+                                                            </div>
                                                             <svg
                                                                 className={`w-3 h-3 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-0' : '-rotate-90'}`}
                                                                 fill="none"
@@ -909,7 +911,7 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                 <select
                                                     value={bet.status}
                                                     onChange={(e) => handleUpdateBetStatus(bet.id, e.target.value as Bet['status'])}
-                                                    className="h-7 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs text-gray-700 dark:text-gray-200"
+                                                    className="h-7 w-24 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 pr-7 text-xs text-gray-700 dark:text-gray-200 text-left"
                                                 >
                                                     <option value="active">Active</option>
                                                     <option value="paused">Paused</option>
@@ -1163,7 +1165,7 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                             <select
                                                                                 value={belief.status}
                                                                                 onChange={(e) => handleUpdateBeliefStatus(belief.id, e.target.value)}
-                                                                                className="h-7 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs text-gray-700 dark:text-gray-200 cursor-help"
+                                                                                className="h-7 w-24 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 pr-7 text-xs text-gray-700 dark:text-gray-200 cursor-help text-left"
                                                                             >
                                                                                 <option value="untested">Untested</option>
                                                                                 <option value="testing">Testing</option>
@@ -1200,8 +1202,10 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                                 {({ attributes, listeners }) => (
                                                                                     <>
                                                                                         <td className="px-6 py-2">
-                                                                                            <div className="flex items-center gap-2 pl-10">
-                                                                                                <DragHandle attributes={attributes} listeners={listeners} />
+                                                                                            <div className="relative flex items-center gap-2 pl-10">
+                                                                                                <div className="absolute left-0 -translate-x-full">
+                                                                                                    <DragHandle attributes={attributes} listeners={listeners} />
+                                                                                                </div>
                                                                                                 <span className="text-[10px] px-1.5 py-0.5 bg-green-200 dark:bg-green-700 rounded font-medium">A</span>
                                                                                                 <div className="min-w-0 flex-1">
                                                                                                     {editingField?.betId === take.id && editingField?.field === `action-description-${take.id}` ? (
@@ -1331,7 +1335,7 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                             <select
                                                                                 value={take.status}
                                                                                 onChange={(e) => handleUpdateActionStatus(take.id, e.target.value)}
-                                                                                className="h-7 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs text-gray-700 dark:text-gray-200 cursor-help"
+                                                                                className="h-7 w-24 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 pr-7 text-xs text-gray-700 dark:text-gray-200 cursor-help text-left"
                                                                             >
                                                                                 <option value="committed">Committed</option>
                                                                                 <option value="done">Done</option>
@@ -1385,8 +1389,10 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                         {({ attributes, listeners }) => (
                                                                             <>
                                                                                 <td className="px-4 py-1">
-                                                                                    <div className="flex items-center gap-2 pl-5">
-                                                                                        <DragHandle attributes={attributes} listeners={listeners} />
+                                                                                    <div className="relative flex items-center gap-2 pl-5">
+                                                                                        <div className="absolute left-0 -translate-x-full">
+                                                                                            <DragHandle attributes={attributes} listeners={listeners} />
+                                                                                        </div>
                                                                                         <span className="text-[10px] px-1.5 py-0.5 bg-green-200 dark:bg-green-700 rounded font-medium">A</span>
                                                                                         <div className="min-w-0 flex-1">
                                                                                             {editingField?.betId === take.id && editingField?.field === `action-description-${take.id}` ? (
@@ -1516,7 +1522,7 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                 <select
                                                                     value={take.status}
                                                                     onChange={(e) => handleUpdateActionStatus(take.id, e.target.value)}
-                                                                    className="h-7 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs text-gray-700 dark:text-gray-200 cursor-help"
+                                                                    className="h-7 w-24 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 pr-7 text-xs text-gray-700 dark:text-gray-200 cursor-help text-left"
                                                                 >
                                                                     <option value="committed">Committed</option>
                                                                     <option value="done">Done</option>
