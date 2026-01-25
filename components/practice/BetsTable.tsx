@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -129,6 +129,8 @@ interface BetsTableProps {
 }
 
 type ScoredBet = Bet & { bet_score: number };
+type QuickAddMode = 'action' | 'belief';
+type ActionStatusChange = { id: string; from: string; to: string };
 
 export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRefresh, onOpenPracticeModal, isCompleted }: BetsTableProps) {
     const [expandedBets, setExpandedBets] = useState<Set<string>>(() =>
@@ -151,6 +153,15 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
     const [beliefStatus, setBeliefStatus] = useState<'untested' | 'testing' | 'proven' | 'disproven'>('untested');
     const [beliefBetId, setBeliefBetId] = useState<string | null>(null);
     const [isBeliefSaving, setIsBeliefSaving] = useState(false);
+    const [quickAddOpen, setQuickAddOpen] = useState(false);
+    const [quickAddMode, setQuickAddMode] = useState<QuickAddMode>('action');
+    const [quickAddText, setQuickAddText] = useState('');
+    const [quickAddBeliefId, setQuickAddBeliefId] = useState<string | null>(null);
+    const [quickAddBetId, setQuickAddBetId] = useState<string | null>(null);
+    const [isQuickAddSaving, setIsQuickAddSaving] = useState(false);
+    const [undoStack, setUndoStack] = useState<ActionStatusChange[]>([]);
+    const [redoStack, setRedoStack] = useState<ActionStatusChange[]>([]);
+    const isRestoringRef = useRef(false);
 
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -184,6 +195,18 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
     useEffect(() => {
         setBetOrder(sortedBets.map(bet => bet.id));
     }, [sortedBets]);
+
+    useEffect(() => {
+        if (!quickAddOpen) return;
+        if (quickAddMode === 'action') {
+            const defaultBelief = beliefs[0] ?? null;
+            setQuickAddBeliefId(defaultBelief?.id ?? null);
+            setQuickAddBetId(defaultBelief?.bet_id ?? bets[0]?.id ?? null);
+        } else {
+            setQuickAddBeliefId(null);
+            setQuickAddBetId(bets[0]?.id ?? null);
+        }
+    }, [quickAddOpen, quickAddMode, beliefs, bets]);
 
     useEffect(() => {
         setActionOrder((prev) => {
@@ -224,6 +247,46 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
             return next;
         });
     }, [boldTakes, sortedBets]);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement | null;
+            const tag = target?.tagName?.toLowerCase();
+            const isEditable = target?.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select';
+            if (isEditable) return;
+
+            if (quickAddOpen && e.key === 'Escape') {
+                e.preventDefault();
+                setQuickAddOpen(false);
+                return;
+            }
+
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleRedo();
+                } else {
+                    handleUndo();
+                }
+                return;
+            }
+
+            if (e.key === 'a' || e.key === 'A') {
+                e.preventDefault();
+                setQuickAddMode('action');
+                setQuickAddOpen(true);
+            }
+
+            if (e.key === 'b' || e.key === 'B') {
+                e.preventDefault();
+                setQuickAddMode('belief');
+                setQuickAddOpen(true);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [handleUndo, handleRedo, quickAddOpen]);
 
     const toggleBet = (betId: string) => {
         const newExpanded = new Set(expandedBets);
@@ -396,7 +459,9 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
         }
     }, [onRefresh]);
 
-    const handleUpdateActionStatus = useCallback(async (actionId: string, newStatus: string) => {
+    const handleUpdateActionStatus = useCallback(async (actionId: string, newStatus: string, trackChange: boolean = true) => {
+        const current = boldTakes.find((take) => take.id === actionId);
+        const previousStatus = current?.status;
         try {
             const res = await fetch(`/api/practice/bold-takes/${actionId}`, {
                 method: 'PUT',
@@ -404,12 +469,91 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                 body: JSON.stringify({ status: newStatus }),
             });
             if (res.ok) {
+                if (trackChange && previousStatus && previousStatus !== newStatus) {
+                    const isDoneChange = newStatus === 'done' || newStatus === 'skipped' || previousStatus === 'done' || previousStatus === 'skipped';
+                    if (isDoneChange && !isRestoringRef.current) {
+                        setUndoStack((prev) => [{ id: actionId, from: previousStatus, to: newStatus }, ...prev].slice(0, 50));
+                        setRedoStack([]);
+                    }
+                }
                 onRefresh?.();
             }
         } catch (error) {
             console.error('Error updating action status:', error);
         }
-    }, [onRefresh]);
+    }, [boldTakes, onRefresh]);
+
+    const handleUndo = useCallback(async () => {
+        if (undoStack.length === 0) return;
+        const [latest, ...rest] = undoStack;
+        setUndoStack(rest);
+        setRedoStack((prev) => [latest, ...prev]);
+        isRestoringRef.current = true;
+        await handleUpdateActionStatus(latest.id, latest.from, false);
+        isRestoringRef.current = false;
+    }, [undoStack, handleUpdateActionStatus]);
+
+    const handleRedo = useCallback(async () => {
+        if (redoStack.length === 0) return;
+        const [latest, ...rest] = redoStack;
+        setRedoStack(rest);
+        setUndoStack((prev) => [latest, ...prev]);
+        isRestoringRef.current = true;
+        await handleUpdateActionStatus(latest.id, latest.to, false);
+        isRestoringRef.current = false;
+    }, [redoStack, handleUpdateActionStatus]);
+
+    const handleQuickAddAction = useCallback(async () => {
+        if (!quickAddText.trim()) return;
+        setIsQuickAddSaving(true);
+        try {
+            const belief = beliefs.find((item) => item.id === quickAddBeliefId);
+            const betId = belief?.bet_id ?? quickAddBetId ?? null;
+            const res = await fetch('/api/practice/bold-takes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    description: quickAddText.trim(),
+                    belief_id: belief?.id ?? null,
+                    bet_id: betId,
+                }),
+            });
+            if (res.ok) {
+                setQuickAddText('');
+                setQuickAddOpen(false);
+                onRefresh?.();
+            }
+        } catch (error) {
+            console.error('Error creating action:', error);
+        } finally {
+            setIsQuickAddSaving(false);
+        }
+    }, [quickAddText, quickAddBeliefId, quickAddBetId, beliefs, onRefresh]);
+
+    const handleQuickAddBelief = useCallback(async () => {
+        if (!quickAddText.trim()) return;
+        setIsQuickAddSaving(true);
+        try {
+            const res = await fetch('/api/practice/beliefs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    belief: quickAddText.trim(),
+                    status: 'untested',
+                    bet_id: quickAddBetId,
+                }),
+            });
+            if (res.ok) {
+                setQuickAddText('');
+                setQuickAddOpen(false);
+                onRefresh?.();
+            }
+        } catch (error) {
+            console.error('Error creating belief:', error);
+        } finally {
+            setIsQuickAddSaving(false);
+        }
+    }, [quickAddText, quickAddBetId, onRefresh]);
 
     const handleUpdateBeliefConfidence = useCallback(async (beliefId: string, confidence: number) => {
         try {
@@ -1613,6 +1757,111 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                     className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-lg transition-colors"
                                 >
                                     {isBeliefSaving ? 'Saving...' : 'Create Belief'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {quickAddOpen && (
+                <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center">
+                    <div className="w-[min(720px,calc(100%-2rem))] rounded-xl border border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 shadow-xl backdrop-blur">
+                        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-gray-800">
+                            <span className="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                                {quickAddMode === 'action' ? 'Action' : 'Belief'}
+                            </span>
+                            <span className="text-[10px] text-gray-400">A/B</span>
+                            <span className="text-[10px] text-gray-400">Enter to save</span>
+                            <span className="text-[10px] text-gray-400">Esc to close</span>
+                        </div>
+                        <div className="flex flex-col gap-2 px-3 py-3">
+                            <input
+                                autoFocus
+                                value={quickAddText}
+                                onChange={(e) => setQuickAddText(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        if (quickAddMode === 'action') {
+                                            handleQuickAddAction();
+                                        } else {
+                                            handleQuickAddBelief();
+                                        }
+                                    }
+                                    if (e.key === 'Escape') {
+                                        setQuickAddOpen(false);
+                                    }
+                                }}
+                                placeholder={quickAddMode === 'action' ? 'Describe the action…' : 'Describe the belief…'}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                            />
+
+                            {quickAddMode === 'action' ? (
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <select
+                                        value={quickAddBeliefId ?? ''}
+                                        onChange={(e) => {
+                                            const nextId = e.target.value || null;
+                                            setQuickAddBeliefId(nextId);
+                                            const linked = beliefs.find((belief) => belief.id === nextId);
+                                            if (linked?.bet_id) {
+                                                setQuickAddBetId(linked.bet_id);
+                                            }
+                                        }}
+                                        className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                    >
+                                        <option value="">Unlinked action</option>
+                                        {beliefs.map((belief) => {
+                                            const betName = bets.find((bet) => bet.id === belief.bet_id)?.name;
+                                            return (
+                                                <option key={belief.id} value={belief.id}>
+                                                    {belief.belief}{betName ? ` — ${betName}` : ''}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                    <select
+                                        value={quickAddBetId ?? ''}
+                                        onChange={(e) => setQuickAddBetId(e.target.value || null)}
+                                        disabled={Boolean(quickAddBeliefId)}
+                                        className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-60"
+                                    >
+                                        <option value="">No bet</option>
+                                        {bets.map((bet) => (
+                                            <option key={bet.id} value={bet.id}>
+                                                {bet.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            ) : (
+                                <select
+                                    value={quickAddBetId ?? ''}
+                                    onChange={(e) => setQuickAddBetId(e.target.value || null)}
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                >
+                                    <option value="">Unlinked belief</option>
+                                    {bets.map((bet) => (
+                                        <option key={bet.id} value={bet.id}>
+                                            {bet.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                            <div className="flex justify-end">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (quickAddMode === 'action') {
+                                            handleQuickAddAction();
+                                        } else {
+                                            handleQuickAddBelief();
+                                        }
+                                    }}
+                                    disabled={!quickAddText.trim() || isQuickAddSaving}
+                                    className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-lg transition-colors"
+                                >
+                                    {isQuickAddSaving ? 'Saving...' : 'Add'}
                                 </button>
                             </div>
                         </div>

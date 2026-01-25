@@ -263,6 +263,48 @@ export async function updateBoldTake(
     return data;
 }
 
+export async function createBoldTake(
+    take: Omit<BoldTake, 'id' | 'created_at' | 'updated_at'>
+): Promise<BoldTake> {
+    const supabase = await createClient();
+    const now = new Date().toISOString();
+
+    let maxOrderQuery = supabase
+        .from('bold_takes')
+        .select('sort_order')
+        .order('sort_order', { ascending: false })
+        .limit(1);
+
+    if (take.bet_id) {
+        maxOrderQuery = maxOrderQuery.eq('bet_id', take.bet_id);
+    } else {
+        maxOrderQuery = maxOrderQuery.is('bet_id', null);
+    }
+
+    if (take.belief_id) {
+        maxOrderQuery = maxOrderQuery.eq('belief_id', take.belief_id);
+    } else {
+        maxOrderQuery = maxOrderQuery.is('belief_id', null);
+    }
+
+    const { data: maxActionOrder } = await maxOrderQuery.maybeSingle();
+    const nextActionOrder = (maxActionOrder?.sort_order ?? 0) + 1;
+
+    const { data, error } = await supabase
+        .from('bold_takes')
+        .insert({
+            ...take,
+            sort_order: take.sort_order ?? nextActionOrder,
+            created_at: now,
+            updated_at: now,
+        })
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
 export async function deleteBoldTake(id: string): Promise<void> {
     const supabase = await createClient();
 
