@@ -339,20 +339,38 @@ export async function deleteBelief(id: string): Promise<void> {
 export async function calculateBetTimeline(betId: string): Promise<number> {
     const supabase = await createClient();
 
-    // Sum duration_days of all committed bold_takes for this bet
-    const { data, error } = await supabase
-        .from('bold_takes')
-        .select('duration_days')
-        .eq('bet_id', betId)
-        .eq('status', 'committed');
+    const [takesResult, beliefsResult] = await Promise.all([
+        supabase
+            .from('bold_takes')
+            .select('duration_days, belief_id')
+            .eq('bet_id', betId)
+            .eq('status', 'committed'),
+        supabase
+            .from('practice_beliefs')
+            .select('id, duration_days')
+            .eq('bet_id', betId),
+    ]);
 
-    if (error) {
-        console.error('Error calculating timeline:', error);
+    if (takesResult.error || beliefsResult.error) {
+        console.error('Error calculating timeline:', takesResult.error || beliefsResult.error);
         return 0;
     }
 
-    const totalDays = data?.reduce((sum, t) => sum + (t.duration_days || 0), 0) || 0;
-    // Convert days to years (365 days per year)
+    const takes = takesResult.data || [];
+    const beliefs = beliefsResult.data || [];
+
+    const beliefDays = beliefs.reduce((sum, belief) => {
+        const linkedActions = takes.filter(take => take.belief_id === belief.id);
+        const derived = linkedActions.reduce((actionSum, take) => actionSum + (take.duration_days || 0), 0);
+        const fallback = belief.duration_days || 0;
+        return sum + (derived > 0 ? derived : fallback);
+    }, 0);
+
+    const unlinkedActionDays = takes
+        .filter(take => !take.belief_id)
+        .reduce((sum, take) => sum + (take.duration_days || 0), 0);
+
+    const totalDays = beliefDays + unlinkedActionDays;
     return totalDays / 365;
 }
 

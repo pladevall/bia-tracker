@@ -28,11 +28,25 @@ export default function PracticePage() {
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            const activeElement = document.activeElement;
+            if (activeElement && ['INPUT', 'TEXTAREA'].includes(activeElement.tagName)) return;
+
             if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
                 if (e.key === 'B' || e.key === 'b') {
                     e.preventDefault();
                     router.push('/');
                 } else if (e.key === 'C' || e.key === 'c') {
+                    e.preventDefault();
+                    router.push('/calendar');
+                }
+            } else if (e.altKey && !e.metaKey && !e.ctrlKey) {
+                if (e.code === 'Digit1') {
+                    e.preventDefault();
+                    router.push('/');
+                } else if (e.code === 'Digit2') {
+                    e.preventDefault();
+                    router.push('/practice');
+                } else if (e.code === 'Digit3') {
                     e.preventDefault();
                     router.push('/calendar');
                 }
@@ -133,9 +147,10 @@ export default function PracticePage() {
                     </div>
                     <div className="flex items-center gap-2">
                         <ThemeToggle />
+                        <span className="h-5 w-px bg-gray-200 dark:bg-gray-700/60" aria-hidden="true" />
                         <Link
                             href="/"
-                            title="Baseline (Cmd+Shift+B)"
+                            title="Baseline (Option+1)"
                             className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -144,8 +159,18 @@ export default function PracticePage() {
                             </svg>
                         </Link>
                         <Link
+                            href="/practice"
+                            title="Practice (Option+2)"
+                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12 5v14" />
+                                <path d="M5 12h14" />
+                            </svg>
+                        </Link>
+                        <Link
                             href="/calendar"
-                            title="Calendar (Cmd+Shift+C)"
+                            title="Calendar (Option+3)"
                             className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

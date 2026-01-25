@@ -3,7 +3,7 @@
  * Calculates a score to rank strategic bets by expected value
  */
 
-import type { Bet, BoldTake } from './types';
+import type { Bet, Belief, BoldTake } from './types';
 import { UPSIDE_OPTIONS } from './types';
 import { getEffectiveConfidence, calculateAutoUpside, calculateBetTimeline } from './bet-calculations';
 
@@ -58,7 +58,11 @@ export function parseTimelineYears(timeline?: string | null): number {
  * Note: If no manual upside_multiplier is set, uses auto-calculated upside
  * based on timeline and confidence.
  */
-export function calculateBetScore(bet: Bet, linkedTakes?: BoldTake[]): number {
+export function calculateBetScore(
+    bet: Bet,
+    linkedTakes?: BoldTake[],
+    linkedBeliefs?: Belief[]
+): number {
     // Use effective confidence (computed or manual)
     const confidence = getEffectiveConfidence(bet);
 
@@ -70,7 +74,7 @@ export function calculateBetScore(bet: Bet, linkedTakes?: BoldTake[]): number {
 
         // If we have linked actions, calculate timeline from them
         if (linkedTakes && linkedTakes.length > 0) {
-            timelineYears = calculateBetTimeline(linkedTakes);
+            timelineYears = calculateBetTimeline(linkedBeliefs ?? [], linkedTakes);
         }
 
         multiplier = calculateAutoUpside(timelineYears, confidence);
@@ -82,7 +86,7 @@ export function calculateBetScore(bet: Bet, linkedTakes?: BoldTake[]): number {
     // Parse timeline
     let timelineYears = parseTimelineYears(bet.timeline);
     if (linkedTakes && linkedTakes.length > 0) {
-        timelineYears = calculateBetTimeline(linkedTakes);
+        timelineYears = calculateBetTimeline(linkedBeliefs ?? [], linkedTakes);
     }
 
     // Avoid division by zero

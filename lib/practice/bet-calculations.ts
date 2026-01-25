@@ -44,7 +44,7 @@ export function calculateWeightedConfidence(
 
 /**
  * Calculate belief duration as sum of linked action durations
- * If no actions, returns belief's own duration_days
+ * Returns 0 when no linked actions exist
  */
 export function calculateBeliefDuration(
     beliefId: string,
@@ -60,10 +60,20 @@ export function calculateBeliefDuration(
  * Calculate bet timeline as sum of all action durations
  * Returns years (days / 365)
  */
-export function calculateBetTimeline(actions: BoldTake[]): number {
-    if (actions.length === 0) return 0;
+export function calculateBetTimeline(beliefs: Belief[], actions: BoldTake[]): number {
+    if (beliefs.length === 0 && actions.length === 0) return 0;
 
-    const totalDays = actions.reduce((sum, a) => sum + (a.duration_days ?? 30), 0);
+    const beliefDays = beliefs.reduce((sum, belief) => {
+        const linkedDuration = calculateBeliefDuration(belief.id, actions);
+        const fallback = belief.duration_days ?? 0;
+        return sum + (linkedDuration > 0 ? linkedDuration : fallback);
+    }, 0);
+
+    const unlinkedActionDays = actions
+        .filter(action => !action.belief_id)
+        .reduce((sum, action) => sum + (action.duration_days ?? 30), 0);
+
+    const totalDays = beliefDays + unlinkedActionDays;
     return totalDays / 365;
 }
 

@@ -17,6 +17,7 @@ export async function PUT(
 
         // Build updates object from body fields
         const updates: any = {};
+        if ('belief' in body) updates.belief = body.belief;
         if ('status' in body) updates.status = body.status;
         if ('evidence' in body) updates.evidence = body.evidence;
         if ('confidence' in body) updates.confidence = body.confidence;

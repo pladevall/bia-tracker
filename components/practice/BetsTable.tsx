@@ -5,7 +5,7 @@ import type { Bet, Belief, BoldTake, UserSettings } from '@/lib/practice/types';
 import { UPSIDE_OPTIONS } from '@/lib/practice/types';
 import { calculateBetScore, getScoreColor, getScoreLabel, parseTimelineYears } from '@/lib/practice/bet-scoring';
 import { formatDownside, formatCurrency } from '@/lib/practice/formatting';
-import { getEffectiveConfidence, isComputedConfidence, calculateExpectedValue, calculateBetTimeline, calculateAutoUpside } from '@/lib/practice/bet-calculations';
+import { getEffectiveConfidence, isComputedConfidence, calculateExpectedValue, calculateBetTimeline, calculateAutoUpside, calculateBeliefDuration } from '@/lib/practice/bet-calculations';
 import BetForm from './BetForm';
 import Tooltip from '@/components/Tooltip';
 
@@ -126,6 +126,8 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
     const [editValue, setEditValue] = useState('');
     const [salaryInput, setSalaryInput] = useState(String(userSettings?.annual_salary ?? 150000));
     const [isSaving, setIsSaving] = useState(false);
+    const [detailFilter, setDetailFilter] = useState<'all' | 'beliefs' | 'actions'>('all');
+    const [hoveredActionId, setHoveredActionId] = useState<string | null>(null);
 
     // Sync salary input when userSettings changes
     useEffect(() => {
@@ -241,6 +243,23 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
         }
     }, [onRefresh]);
 
+    const handleUpdateBeliefText = useCallback(async (beliefId: string, beliefText: string) => {
+        if (!beliefText.trim()) return;
+        try {
+            const res = await fetch(`/api/practice/beliefs/${beliefId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ belief: beliefText.trim() }),
+            });
+            if (res.ok) {
+                setEditingField(null);
+                onRefresh?.();
+            }
+        } catch (error) {
+            console.error('Error updating belief text:', error);
+        }
+    }, [onRefresh]);
+
     const handleUpdateActionConfidence = useCallback(async (actionId: string, confidence: number) => {
         try {
             const res = await fetch(`/api/practice/bold-takes/${actionId}`, {
@@ -253,6 +272,23 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
             }
         } catch (error) {
             console.error('Error updating action confidence:', error);
+        }
+    }, [onRefresh]);
+
+    const handleUpdateActionDescription = useCallback(async (actionId: string, description: string) => {
+        if (!description.trim()) return;
+        try {
+            const res = await fetch(`/api/practice/bold-takes/${actionId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ description: description.trim() }),
+            });
+            if (res.ok) {
+                setEditingField(null);
+                onRefresh?.();
+            }
+        } catch (error) {
+            console.error('Error updating action description:', error);
         }
     }, [onRefresh]);
 
@@ -270,6 +306,25 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
             console.error('Error updating action duration:', error);
         }
     }, [onRefresh]);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!hoveredActionId) return;
+            const activeElement = document.activeElement;
+            if (activeElement && ['INPUT', 'TEXTAREA'].includes(activeElement.tagName)) return;
+
+            if (e.key === 'd' || e.key === 'D') {
+                e.preventDefault();
+                handleUpdateActionStatus(hoveredActionId, 'done');
+            } else if (e.key === 's' || e.key === 'S') {
+                e.preventDefault();
+                handleUpdateActionStatus(hoveredActionId, 'skipped');
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [hoveredActionId, handleUpdateActionStatus]);
 
     const handleCreateBet = useCallback(async (betData: Partial<Bet>) => {
         try {
@@ -316,9 +371,9 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
 
     // Status styles
     const statusStyles: Record<string, string> = {
-        active: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-        paused: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-        closed: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+        active: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-400/30',
+        paused: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 ring-1 ring-amber-400/30',
+        closed: 'bg-slate-500/10 text-slate-500 dark:text-slate-400 ring-1 ring-slate-400/30',
     };
 
     // Confidence color (0-100 scale)
@@ -443,6 +498,21 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                     </div>
 
                     <div className="flex items-center gap-3">
+                        <div className="flex items-center rounded-md border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 p-0.5">
+                            {(['all', 'beliefs', 'actions'] as const).map((option) => (
+                                <button
+                                    key={option}
+                                    onClick={() => setDetailFilter(option)}
+                                    className={`px-2 py-1 text-[10px] font-medium uppercase tracking-wide rounded-sm transition-colors ${
+                                        detailFilter === option
+                                            ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm'
+                                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                    }`}
+                                >
+                                    {option}
+                                </button>
+                            ))}
+                        </div>
                         <button
                             onClick={() => setIsFormOpen(true)}
                             className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium"
@@ -482,6 +552,9 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                 <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[90px]">
                                     Timeline
                                 </th>
+                                <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[90px]">
+                                    Confidence
+                                </th>
                                 <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[80px]">
                                     Upside
                                 </th>
@@ -490,9 +563,6 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                 </th>
                                 <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[90px]">
                                     Downside
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[90px]">
-                                    Confidence
                                 </th>
                                 <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[80px]">
                                     Score
@@ -509,10 +579,19 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                 const isExpanded = expandedBets.has(bet.id);
                                 const linkedBeliefs = beliefs.filter(b => b.bet_id === bet.id);
                                 const linkedTakes = boldTakes.filter(t => t.bet_id === bet.id);
+                                const showBeliefs = detailFilter !== 'actions';
+                                const showActions = detailFilter !== 'beliefs';
+                                const hasBeliefs = linkedBeliefs.length > 0;
+                                const hasActions = linkedTakes.length > 0;
+                                const showEmptyState = detailFilter === 'all'
+                                    ? !hasBeliefs && !hasActions
+                                    : detailFilter === 'beliefs'
+                                        ? !hasBeliefs
+                                        : !hasActions;
                                 const score = bet.bet_score ?? calculateBetScore(bet);
                                 const scoreColor = getScoreColor(score);
                                 const isEditing = editingField?.betId === bet.id;
-                                const timelineYears = calculateBetTimeline(linkedTakes);
+                                const timelineYears = calculateBetTimeline(linkedBeliefs, linkedTakes);
                                 const effectiveConfidence = getEffectiveConfidence(bet);
 
                                 // Calculate downside (opportunity cost)
@@ -559,15 +638,20 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                             {/* Timeline with Rich Tooltip */}
                                             <td className="px-3 py-2 text-center text-xs text-gray-700 dark:text-gray-300">
                                                 {(() => {
-                                                    const actionDurations = linkedTakes.map(t => t.duration_days ?? 30);
-                                                    const beliefDurations = linkedBeliefs.map(b => b.duration_days ?? 0);
-                                                    const allDurations = [...actionDurations, ...beliefDurations];
+                                                    const beliefDurations = linkedBeliefs.map(belief => {
+                                                        const derived = calculateBeliefDuration(belief.id, linkedTakes);
+                                                        return derived > 0 ? derived : (belief.duration_days ?? 0);
+                                                    });
+                                                    const unlinkedActionDurations = linkedTakes
+                                                        .filter(take => !take.belief_id)
+                                                        .map(take => take.duration_days ?? 30);
+                                                    const allDurations = [...beliefDurations, ...unlinkedActionDurations];
                                                     const totalDays = allDurations.reduce((sum, d) => sum + d, 0);
 
                                                     return (
                                                         <Tooltip content={
                                                             <div className="space-y-1">
-                                                                <div className="font-semibold text-white">Timeline Calculation:</div>
+                                                                <div className="font-semibold text-white">Timeline Rollup:</div>
                                                                 <div className="text-xs font-mono space-y-0.5">
                                                                     {allDurations.length > 0 ? (
                                                                         <>
@@ -578,7 +662,7 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                         <div>No actions defined yet</div>
                                                                     )}
                                                                 </div>
-                                                                <div className="text-xs text-gray-300 mt-1">Estimated time to realize bet outcome</div>
+                                                                <div className="text-xs text-gray-300 mt-1">Belief durations roll up from actions, plus unlinked actions</div>
                                                             </div>
                                                         }>
                                                             <span className="cursor-help">
@@ -590,6 +674,33 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                         </Tooltip>
                                                     );
                                                 })()}
+                                            </td>
+                                            {/* Confidence */}
+                                            <td className={`px-3 py-2 text-center text-xs font-medium tabular-nums ${getConfidenceColor(effectiveConfidence)}`}>
+                                                <Tooltip content={
+                                                    <div className="space-y-1">
+                                                        <div className="font-semibold text-white">Confidence Assessment:</div>
+                                                        {isComputedConfidence(bet) ? (
+                                                            <>
+                                                                <div className="text-xs font-mono">{effectiveConfidence}% (auto-calculated)</div>
+                                                                <div className="text-xs text-gray-300">Weighted average from {linkedBeliefs.length + linkedTakes.length} beliefs/actions</div>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <div className="text-xs font-mono">{effectiveConfidence}% (manual)</div>
+                                                                <div className="text-xs text-gray-300">Set manually, no beliefs/actions yet</div>
+                                                            </>
+                                                        )}
+                                                        <div className="border-t border-gray-600 pt-1 mt-1">
+                                                            <div className="text-xs text-gray-300">Based on available evidence and conviction</div>
+                                                        </div>
+                                                    </div>
+                                                }>
+                                                    <span className="cursor-help">
+                                                        {effectiveConfidence}%
+                                                        {isComputedConfidence(bet) && <span className="text-[8px] ml-0.5">◆</span>}
+                                                    </span>
+                                                </Tooltip>
                                             </td>
                                             {/* Upside - Inline Editable with Rich Tooltip */}
                                             <td
@@ -760,33 +871,6 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                     );
                                                 })()}
                                             </td>
-                                            {/* Confidence with Rich Tooltip (UPDATED) */}
-                                            <td className={`px-3 py-2 text-center text-xs font-medium tabular-nums ${getConfidenceColor(effectiveConfidence)}`}>
-                                                <Tooltip content={
-                                                    <div className="space-y-1">
-                                                        <div className="font-semibold text-white">Confidence Assessment:</div>
-                                                        {isComputedConfidence(bet) ? (
-                                                            <>
-                                                                <div className="text-xs font-mono">{effectiveConfidence}% (auto-calculated)</div>
-                                                                <div className="text-xs text-gray-300">Weighted average from {linkedBeliefs.length + linkedTakes.length} beliefs/actions</div>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <div className="text-xs font-mono">{effectiveConfidence}% (manual)</div>
-                                                                <div className="text-xs text-gray-300">Set manually, no beliefs/actions yet</div>
-                                                            </>
-                                                        )}
-                                                        <div className="border-t border-gray-600 pt-1 mt-1">
-                                                            <div className="text-xs text-gray-300">Based on available evidence and conviction</div>
-                                                        </div>
-                                                    </div>
-                                                }>
-                                                    <span className="cursor-help">
-                                                        {effectiveConfidence}%
-                                                        {isComputedConfidence(bet) && <span className="text-[8px] ml-0.5">◆</span>}
-                                                    </span>
-                                                </Tooltip>
-                                            </td>
                                             {/* Score with Rich Tooltip */}
                                             <td className={`px-3 py-2 text-center text-xs font-bold tabular-nums ${scoreColor}`}>
                                                 {(() => {
@@ -836,7 +920,7 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                 })()}
                                             </td>
                                             <td className="px-3 py-2 text-center">
-                                                <span className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded-full ${statusStyles[bet.status]}`}>
+                                                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded-full ${statusStyles[bet.status]}`}>
                                                     {bet.status}
                                                 </span>
                                             </td>
@@ -861,103 +945,160 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                     return (
                                                         <React.Fragment key={`belief-${belief.id}`}>
                                                             {/* Belief Row */}
-                                                            <tr className="border-b border-gray-100 dark:border-gray-800/50 bg-indigo-50/30 dark:bg-indigo-900/10">
-                                                                <td className="px-4 py-1">
-                                                                    <div className="flex items-center gap-2 pl-5">
-                                                                        <span className="text-[10px] px-1.5 py-0.5 bg-indigo-200 dark:bg-indigo-700 rounded font-medium">B</span>
-                                                                        <span className="text-xs text-gray-900 dark:text-gray-100">{belief.belief}</span>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-3 py-1 text-center">
-                                                                    <Tooltip content="Auto-calculated from sum of linked actions">
-                                                                        <span className="text-xs text-gray-500 dark:text-gray-400 cursor-help">
-                                                                            {belief.duration_days ?? 0}d
-                                                                        </span>
-                                                                    </Tooltip>
-                                                                </td>
-                                                                <td className="px-3 py-1"></td>
-                                                                <td className="px-3 py-1"></td>
-                                                                <td className="px-3 py-1"></td>
-                                                                <td className="px-3 py-1 text-center" onClick={(e) => e.stopPropagation()}>
-                                                                    {editingField?.betId === belief.id && editingField?.field === `belief-confidence-${belief.id}` ? (
-                                                                        <input
-                                                                            autoFocus
-                                                                            type="number"
-                                                                            min="0"
-                                                                            max="100"
-                                                                            value={editValue}
-                                                                            onChange={(e) => setEditValue(e.target.value)}
-                                                                            onBlur={() => {
-                                                                                const val = parseInt(editValue);
-                                                                                if (!isNaN(val) && val >= 0 && val <= 100) {
-                                                                                    handleUpdateBeliefConfidence(belief.id, val);
-                                                                                }
-                                                                                setEditingField(null);
-                                                                            }}
-                                                                            onKeyDown={(e) => {
-                                                                                if (e.key === 'Enter') {
+                                                            {showBeliefs && (
+                                                                <tr className="border-b border-gray-100 dark:border-gray-800/50 bg-indigo-50/30 dark:bg-indigo-900/10">
+                                                                    <td className="px-4 py-1">
+                                                                        <div className="flex items-center gap-2 pl-5">
+                                                                            <span className="text-[10px] px-1.5 py-0.5 bg-indigo-200 dark:bg-indigo-700 rounded font-medium">B</span>
+                                                                            {editingField?.betId === belief.id && editingField?.field === `belief-text-${belief.id}` ? (
+                                                                                <input
+                                                                                    autoFocus
+                                                                                    value={editValue}
+                                                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                                                    onBlur={() => handleUpdateBeliefText(belief.id, editValue)}
+                                                                                    onKeyDown={(e) => {
+                                                                                        if (e.key === 'Enter') handleUpdateBeliefText(belief.id, editValue);
+                                                                                        if (e.key === 'Escape') setEditingField(null);
+                                                                                    }}
+                                                                                    className="w-full min-w-[220px] px-2 py-0.5 text-xs border border-indigo-300 dark:border-indigo-700 rounded bg-white dark:bg-gray-900"
+                                                                                />
+                                                                            ) : (
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleStartEdit(belief.id, `belief-text-${belief.id}`, belief.belief);
+                                                                                    }}
+                                                                                    className="text-left text-xs text-gray-900 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-300"
+                                                                                >
+                                                                                    {belief.belief}
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-3 py-1 text-center">
+                                                                        <Tooltip content="Auto-calculated from sum of linked actions">
+                                                                            <span className="text-xs text-gray-500 dark:text-gray-400 cursor-help">
+                                                                                {(() => {
+                                                                                    const derived = calculateBeliefDuration(belief.id, linkedTakes);
+                                                                                    const fallback = belief.duration_days ?? 0;
+                                                                                    return `${derived > 0 ? derived : fallback}d`;
+                                                                                })()}
+                                                                            </span>
+                                                                        </Tooltip>
+                                                                    </td>
+                                                                    <td className="px-3 py-1 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                        {editingField?.betId === belief.id && editingField?.field === `belief-confidence-${belief.id}` ? (
+                                                                            <input
+                                                                                autoFocus
+                                                                                type="number"
+                                                                                min="0"
+                                                                                max="100"
+                                                                                value={editValue}
+                                                                                onChange={(e) => setEditValue(e.target.value)}
+                                                                                onBlur={() => {
                                                                                     const val = parseInt(editValue);
                                                                                     if (!isNaN(val) && val >= 0 && val <= 100) {
                                                                                         handleUpdateBeliefConfidence(belief.id, val);
                                                                                     }
                                                                                     setEditingField(null);
-                                                                                }
-                                                                                if (e.key === 'Escape') setEditingField(null);
-                                                                            }}
-                                                                            className="w-16 px-2 py-0.5 text-xs text-center border border-indigo-500 rounded bg-indigo-50 dark:bg-indigo-900/20"
-                                                                        />
-                                                                    ) : (
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                setEditingField({ betId: belief.id, field: `belief-confidence-${belief.id}` });
-                                                                                setEditValue(String(belief.confidence ?? 50));
-                                                                            }}
-                                                                            className="text-xs text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline"
-                                                                        >
-                                                                            {belief.confidence ?? 50}%
-                                                                        </button>
-                                                                    )}
-                                                                </td>
-                                                                <td className="px-3 py-1"></td>
-                                                                <td className="px-3 py-1 text-center" onClick={(e) => e.stopPropagation()}>
-                                                                    <Tooltip content={
-                                                                        <div className="space-y-2 max-w-xs">
-                                                                            <div className="font-semibold text-white">Belief Status: {belief.status}</div>
-                                                                            <div className="text-xs text-gray-200">
-                                                                                {BELIEF_STATUS_GUIDANCE[belief.status as keyof typeof BELIEF_STATUS_GUIDANCE]?.description || 'Unknown status'}
+                                                                                }}
+                                                                                onKeyDown={(e) => {
+                                                                                    if (e.key === 'Enter') {
+                                                                                        const val = parseInt(editValue);
+                                                                                        if (!isNaN(val) && val >= 0 && val <= 100) {
+                                                                                            handleUpdateBeliefConfidence(belief.id, val);
+                                                                                        }
+                                                                                        setEditingField(null);
+                                                                                    }
+                                                                                    if (e.key === 'Escape') setEditingField(null);
+                                                                                }}
+                                                                                className="w-16 px-2 py-0.5 text-xs text-center border border-indigo-500 rounded bg-indigo-50 dark:bg-indigo-900/20"
+                                                                            />
+                                                                        ) : (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setEditingField({ betId: belief.id, field: `belief-confidence-${belief.id}` });
+                                                                                    setEditValue(String(belief.confidence ?? 50));
+                                                                                }}
+                                                                                className="text-xs text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline"
+                                                                            >
+                                                                                {belief.confidence ?? 50}%
+                                                                            </button>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="px-3 py-1"></td>
+                                                                    <td className="px-3 py-1"></td>
+                                                                    <td className="px-3 py-1"></td>
+                                                                    <td className="px-3 py-1"></td>
+                                                                    <td className="px-3 py-1 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                        <Tooltip content={
+                                                                            <div className="space-y-2 max-w-xs">
+                                                                                <div className="font-semibold text-white">Belief Status: {belief.status}</div>
+                                                                                <div className="text-xs text-gray-200">
+                                                                                    {BELIEF_STATUS_GUIDANCE[belief.status as keyof typeof BELIEF_STATUS_GUIDANCE]?.description || 'Unknown status'}
+                                                                                </div>
+                                                                                <div className="text-[10px] text-gray-300 border-t border-gray-600 pt-1 mt-1">
+                                                                                    <div className="font-medium">When to use:</div>
+                                                                                    <div>{BELIEF_STATUS_GUIDANCE[belief.status as keyof typeof BELIEF_STATUS_GUIDANCE]?.when || ''}</div>
+                                                                                </div>
+                                                                                <div className="text-[10px] text-gray-300">
+                                                                                    <div className="font-medium">Next step:</div>
+                                                                                    <div>{BELIEF_STATUS_GUIDANCE[belief.status as keyof typeof BELIEF_STATUS_GUIDANCE]?.next || ''}</div>
+                                                                                </div>
                                                                             </div>
-                                                                            <div className="text-[10px] text-gray-300 border-t border-gray-600 pt-1 mt-1">
-                                                                                <div className="font-medium">When to use:</div>
-                                                                                <div>{BELIEF_STATUS_GUIDANCE[belief.status as keyof typeof BELIEF_STATUS_GUIDANCE]?.when || ''}</div>
-                                                                            </div>
-                                                                            <div className="text-[10px] text-gray-300">
-                                                                                <div className="font-medium">Next step:</div>
-                                                                                <div>{BELIEF_STATUS_GUIDANCE[belief.status as keyof typeof BELIEF_STATUS_GUIDANCE]?.next || ''}</div>
-                                                                            </div>
-                                                                        </div>
-                                                                    }>
-                                                                        <select
-                                                                            value={belief.status}
-                                                                            onChange={(e) => handleUpdateBeliefStatus(belief.id, e.target.value)}
-                                                                            className="text-[10px] px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 cursor-help"
-                                                                        >
-                                                                            <option value="untested">Untested</option>
-                                                                            <option value="testing">Testing</option>
-                                                                            <option value="proven">Proven</option>
-                                                                            <option value="disproven">Disproven</option>
-                                                                        </select>
-                                                                    </Tooltip>
-                                                                </td>
-                                                                <td className="px-3 py-1"></td>
-                                                            </tr>
+                                                                        }>
+                                                                            <select
+                                                                                value={belief.status}
+                                                                                onChange={(e) => handleUpdateBeliefStatus(belief.id, e.target.value)}
+                                                                                className="text-[10px] px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 cursor-help"
+                                                                            >
+                                                                                <option value="untested">Untested</option>
+                                                                                <option value="testing">Testing</option>
+                                                                                <option value="proven">Proven</option>
+                                                                                <option value="disproven">Disproven</option>
+                                                                            </select>
+                                                                        </Tooltip>
+                                                                    </td>
+                                                                    <td className="px-3 py-1"></td>
+                                                                </tr>
+                                                            )}
 
                                                             {/* Action Rows (nested under belief) */}
-                                                            {beliefActions.map(take => (
-                                                                <tr key={`action-${take.id}`} className="border-b border-gray-100 dark:border-gray-800/50 bg-green-50/20 dark:bg-green-900/5">
+                                                            {showActions && beliefActions.map(take => (
+                                                                <tr
+                                                                    key={`action-${take.id}`}
+                                                                    className="border-b border-gray-100 dark:border-gray-800/50 bg-green-50/20 dark:bg-green-900/5"
+                                                                    onMouseEnter={() => setHoveredActionId(take.id)}
+                                                                    onMouseLeave={() => setHoveredActionId(null)}
+                                                                >
                                                                     <td className="px-4 py-1">
                                                                         <div className="flex items-center gap-2 pl-10">
                                                                             <span className="text-[10px] px-1.5 py-0.5 bg-green-200 dark:bg-green-700 rounded font-medium">A</span>
-                                                                            <span className="text-xs text-gray-900 dark:text-gray-100">{take.description}</span>
+                                                                            <div className="min-w-0">
+                                                                                {editingField?.betId === take.id && editingField?.field === `action-description-${take.id}` ? (
+                                                                                    <input
+                                                                                        autoFocus
+                                                                                        value={editValue}
+                                                                                        onChange={(e) => setEditValue(e.target.value)}
+                                                                                        onBlur={() => handleUpdateActionDescription(take.id, editValue)}
+                                                                                        onKeyDown={(e) => {
+                                                                                            if (e.key === 'Enter') handleUpdateActionDescription(take.id, editValue);
+                                                                                            if (e.key === 'Escape') setEditingField(null);
+                                                                                        }}
+                                                                                        className="w-full min-w-[220px] px-2 py-0.5 text-xs border border-green-300 dark:border-green-700 rounded bg-white dark:bg-gray-900"
+                                                                                    />
+                                                                                ) : (
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleStartEdit(take.id, `action-description-${take.id}`, take.description);
+                                                                                        }}
+                                                                                        className="text-left text-xs text-gray-900 dark:text-gray-100 hover:text-green-600 dark:hover:text-green-300"
+                                                                                    >
+                                                                                        {take.description}
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
                                                                     </td>
                                                                     <td className="px-3 py-1 text-center" onClick={(e) => e.stopPropagation()}>
@@ -999,9 +1140,6 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                             </button>
                                                                         )}
                                                                     </td>
-                                                                    <td className="px-3 py-1"></td>
-                                                                    <td className="px-3 py-1"></td>
-                                                                    <td className="px-3 py-1"></td>
                                                                     <td className="px-3 py-1 text-center" onClick={(e) => e.stopPropagation()}>
                                                                         {editingField?.betId === take.id && editingField?.field === `action-confidence-${take.id}` ? (
                                                                             <input
@@ -1043,6 +1181,9 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                         )}
                                                                     </td>
                                                                     <td className="px-3 py-1"></td>
+                                                                    <td className="px-3 py-1"></td>
+                                                                    <td className="px-3 py-1"></td>
+                                                                    <td className="px-3 py-1"></td>
                                                                     <td className="px-3 py-1 text-center" onClick={(e) => e.stopPropagation()}>
                                                                         <Tooltip content={
                                                                             <div className="space-y-2 max-w-xs">
@@ -1079,12 +1220,39 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                 })}
 
                                                 {/* Actions without linked beliefs */}
-                                                {boldTakes.filter(t => t.bet_id === bet.id && !t.belief_id).map(take => (
-                                                    <tr key={`unlinked-action-${take.id}`} className="border-b border-gray-100 dark:border-gray-800/50 bg-green-50/20 dark:bg-green-900/5">
+                                                {showActions && boldTakes.filter(t => t.bet_id === bet.id && !t.belief_id).map(take => (
+                                                    <tr
+                                                        key={`unlinked-action-${take.id}`}
+                                                        className="border-b border-gray-100 dark:border-gray-800/50 bg-green-50/20 dark:bg-green-900/5"
+                                                        onMouseEnter={() => setHoveredActionId(take.id)}
+                                                        onMouseLeave={() => setHoveredActionId(null)}
+                                                    >
                                                         <td className="px-4 py-1">
                                                             <div className="flex items-center gap-2 pl-5">
                                                                 <span className="text-[10px] px-1.5 py-0.5 bg-green-200 dark:bg-green-700 rounded font-medium">A</span>
-                                                                <span className="text-xs text-gray-900 dark:text-gray-100">{take.description}</span>
+                                                                {editingField?.betId === take.id && editingField?.field === `action-description-${take.id}` ? (
+                                                                    <input
+                                                                        autoFocus
+                                                                        value={editValue}
+                                                                        onChange={(e) => setEditValue(e.target.value)}
+                                                                        onBlur={() => handleUpdateActionDescription(take.id, editValue)}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter') handleUpdateActionDescription(take.id, editValue);
+                                                                            if (e.key === 'Escape') setEditingField(null);
+                                                                        }}
+                                                                        className="w-full min-w-[220px] px-2 py-0.5 text-xs border border-green-300 dark:border-green-700 rounded bg-white dark:bg-gray-900"
+                                                                    />
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleStartEdit(take.id, `action-description-${take.id}`, take.description);
+                                                                        }}
+                                                                        className="text-left text-xs text-gray-900 dark:text-gray-100 hover:text-green-600 dark:hover:text-green-300"
+                                                                    >
+                                                                        {take.description}
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </td>
                                                         <td className="px-3 py-1 text-center" onClick={(e) => e.stopPropagation()}>
@@ -1126,9 +1294,6 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                                 </button>
                                                             )}
                                                         </td>
-                                                        <td className="px-3 py-1"></td>
-                                                        <td className="px-3 py-1"></td>
-                                                        <td className="px-3 py-1"></td>
                                                         <td className="px-3 py-1 text-center" onClick={(e) => e.stopPropagation()}>
                                                             {editingField?.betId === take.id && editingField?.field === `action-confidence-${take.id}` ? (
                                                                 <input
@@ -1170,6 +1335,9 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                             )}
                                                         </td>
                                                         <td className="px-3 py-1"></td>
+                                                        <td className="px-3 py-1"></td>
+                                                        <td className="px-3 py-1"></td>
+                                                        <td className="px-3 py-1"></td>
                                                         <td className="px-3 py-1 text-center" onClick={(e) => e.stopPropagation()}>
                                                             <Tooltip content={
                                                                 <div className="space-y-2 max-w-xs">
@@ -1203,11 +1371,15 @@ export default function BetsTable({ bets, beliefs, boldTakes, userSettings, onRe
                                                 ))}
 
                                                 {/* Empty State */}
-                                                {linkedBeliefs.length === 0 && linkedTakes.length === 0 && (
+                                                {showEmptyState && (
                                                     <tr className="border-b border-gray-100 dark:border-gray-800/50 bg-gray-50/30 dark:bg-gray-800/10">
                                                         <td colSpan={9} className="px-4 py-3 text-center">
                                                             <p className="text-[10px] text-gray-500 dark:text-gray-400 italic">
-                                                                No beliefs or actions linked yet
+                                                                {detailFilter === 'beliefs'
+                                                                    ? 'No beliefs linked yet'
+                                                                    : detailFilter === 'actions'
+                                                                        ? 'No actions linked yet'
+                                                                        : 'No beliefs or actions linked yet'}
                                                             </p>
                                                         </td>
                                                     </tr>
