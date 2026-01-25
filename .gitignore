@@ -3,6 +3,7 @@
 # dependencies
 /node_modules
 /raycast/node_modules
+/raycast/raycast-env.d.ts
 /.pnp
 .pnp.*
 .yarn/*

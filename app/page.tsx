@@ -145,7 +145,7 @@ export default function Home() {
     return viewMode === section;
   }, [viewMode]);
 
-  // Keyboard shortcuts: Cmd+Shift+C for Calendar, Cmd+Shift+P for Practice
+  // Keyboard shortcuts: Cmd+Shift+C for Calendar, Cmd+Shift+P for Actions
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
@@ -154,7 +154,7 @@ export default function Home() {
           router.push('/calendar');
         } else if (e.key === 'P' || e.key === 'p') {
           e.preventDefault();
-          router.push('/practice');
+          router.push('/actions');
         }
       }
     };
@@ -576,8 +576,8 @@ export default function Home() {
             <ThemeToggle />
             <span className="h-5 w-px bg-gray-200 dark:bg-gray-700/60" aria-hidden="true" />
             <Link
-              href="/practice"
-              title="Practice (Cmd+Shift+P)"
+              href="/actions"
+              title="Actions (Cmd+Shift+P)"
               className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

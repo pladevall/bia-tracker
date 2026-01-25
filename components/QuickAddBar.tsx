@@ -10,7 +10,7 @@ type QuickAddMode = "action" | "belief";
 
 export default function QuickAddBar() {
   const pathname = usePathname();
-  const isEnabled = pathname === "/practice";
+  const isEnabled = pathname === "/actions";
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<QuickAddMode>("action");
   const [text, setText] = useState("");
